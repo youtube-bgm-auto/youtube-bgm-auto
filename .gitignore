@@ -1,0 +1,39 @@
+# 認証情報・シークレット（絶対にGitHubに上げない）
+token.pickle
+client_secret*.json
+.env
+
+# 一時ファイル
+tmp/
+*.mp4
+*.mp3
+*.wav
+*.jpg
+*.png
+*.log
+
+# 状態管理ファイル（個人の環境依存）
+playlists.json
+shorts_history.json
+fantasy_queue.json
+posted.json
+.last_upload
+run.log
+fantasy.log
+news.log
+history.json
+replied_comments.json
+analytics_log.json
+
+# launchdのplistはパスが個人依存のためサンプルのみ配布
+com.bgm.*.plist
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# フォント（ライセンスの関係で配布しない）
+fonts/
