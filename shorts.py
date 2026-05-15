@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from generate import SOUNDS, _fetch_photo
 from upload import upload_video, get_authenticated_service
 from playlists import add_to_playlist
+from x_post import post_shorts_tweet
 
 TMP_DIR   = os.path.join(os.path.dirname(__file__), "tmp")
 W, H      = 1080, 1920   # 縦型
@@ -190,6 +191,7 @@ def post_short(sound: dict | None = None):
     video_id = upload_video(video_path, None, meta)
     add_to_playlist(youtube, video_id, sound["type"])
     logging.info(f"[Shorts] Done: https://www.youtube.com/watch?v={video_id}")
+    post_shorts_tweet(title, video_id)
 
     if os.path.exists(video_path):
         os.remove(video_path)

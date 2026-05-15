@@ -909,6 +909,65 @@ TITLE_TEMPLATES = {
     "dragon_cave":     "Dragon's Cave Ambiance 🐉🔥 | {d} Dark Fantasy D&D Music",
 }
 
+# アフィリエイトリンク（カテゴリ別）
+AFFILIATE_LINKS = {
+    "default": """\
+🛒 Recommended for better sleep:
+🔊 White Noise Machine → https://amzn.to/3R3qsMx
+🎧 Sleep Headphones (Bluetooth) → https://amzn.to/4fjALG3
+😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg
+🔈 Pillow Speaker → https://amzn.to/4doJIvg""",
+
+    "fireplace": """\
+🛒 Create the perfect cozy atmosphere:
+🔥 Fireplace Crackling Video → https://amzn.to/4npvJd8
+🎧 Sleep Headphones (Bluetooth) → https://amzn.to/4fjALG3
+😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg
+🔈 Pillow Speaker → https://amzn.to/4doJIvg""",
+
+    "rain": """\
+🛒 Enhance your rainy night experience:
+🌧️ Rain Sound Machine → https://amzn.to/3QYw0bb
+🎧 Sleep Headphones (Bluetooth) → https://amzn.to/4fjALG3
+😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg
+🔈 Pillow Speaker → https://amzn.to/4doJIvg""",
+
+    "nature": """\
+🛒 Bring nature sounds into your space:
+🔊 White Noise Machine → https://amzn.to/3R3qsMx
+🔉 Waterproof Bluetooth Speaker → https://amzn.to/4tvbZWX
+🎧 Sleep Headphones (Bluetooth) → https://amzn.to/4fjALG3
+😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg""",
+
+    "fantasy": """\
+🛒 Level up your tabletop RPG session:
+🐉 D&D Monster Manual → https://amzn.to/4nyf7Ak
+🎧 Gaming Headset → https://amzn.to/4fjALG3
+🔈 Bluetooth Speaker → https://amzn.to/4tvbZWX""",
+}
+
+# 音源タイプ → アフィリエイトカテゴリのマッピング
+AFFILIATE_CATEGORY = {
+    "fireplace":    "fireplace",
+    "rain_light":   "rain",
+    "rain_heavy":   "rain",
+    "thunderstorm": "rain",
+    "rain_roof":    "rain",
+    "ocean":          "nature",
+    "beach":          "nature",
+    "river":          "nature",
+    "waterfall":      "nature",
+    "forest":         "nature",
+    "fantasy_library":  "fantasy",
+    "medieval_tavern":  "fantasy",
+    "enchanted_forest": "fantasy",
+    "ancient_temple":   "fantasy",
+    "cozy_cottage":     "fantasy",
+    "castle_wind":      "fantasy",
+    "space_station":    "fantasy",
+    "dragon_cave":      "fantasy",
+}
+
 DESCRIPTION_TEMPLATES = {
     "default": """{headline}
 
@@ -923,6 +982,10 @@ DESCRIPTION_TEMPLATES = {
 → Enable "Loop" to play all night
 
 🔔 Subscribe for new sleep sounds uploaded every day.
+
+{affiliate}
+
+*As an Amazon Associate I earn from qualifying purchases.
 
 {tags}""",
 }
@@ -941,8 +1004,10 @@ def build_metadata(sound: dict, hours: int = 1) -> dict:
         "#studymusic", "#ambientnoise", "#asmr",
         f"#{duration_str.lower().replace(' ', '')}",
     ])
+    affiliate_key = AFFILIATE_CATEGORY.get(sound["type"], "default")
+    affiliate = AFFILIATE_LINKS[affiliate_key]
     description = DESCRIPTION_TEMPLATES["default"].format(
-        headline=headline, tags=hashtags
+        headline=headline, affiliate=affiliate, tags=hashtags
     )
 
     fantasy_types = {"fantasy_library", "medieval_tavern", "enchanted_forest",

@@ -5,6 +5,7 @@ from datetime import datetime
 from generate import pick_sound, generate_video, generate_thumbnail, build_metadata, save_photo_to_file, fetch_background_video
 from upload import upload_video, get_authenticated_service
 from playlists import ensure_playlists, add_to_playlist
+from x_post import post_video_tweet
 
 LOG_FILE = os.path.join(os.path.dirname(__file__), "run.log")
 TMP_DIR = os.path.join(os.path.dirname(__file__), "tmp")
@@ -68,6 +69,7 @@ def main():
         vid_1h = upload_video(video_1h, thumb_1h, meta_1h)
         logging.info(f"[1h] Done: https://www.youtube.com/watch?v={vid_1h}")
         add_to_playlist(youtube, vid_1h, sound["type"])
+        post_video_tweet(meta_1h["title"], vid_1h, hours=1)
 
         # ── 8時間版アップロード ──
         meta_8h = build_metadata(sound, hours=8)
@@ -75,6 +77,7 @@ def main():
         vid_8h = upload_video(video_8h, thumb_8h, meta_8h)
         logging.info(f"[8h] Done: https://www.youtube.com/watch?v={vid_8h}")
         add_to_playlist(youtube, vid_8h, sound["type"])
+        post_video_tweet(meta_8h["title"], vid_8h, hours=8)
 
         logging.info("All versions uploaded successfully.")
 
