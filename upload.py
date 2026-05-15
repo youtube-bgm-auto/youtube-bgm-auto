@@ -43,6 +43,7 @@ def upload_video(video_path: str, thumbnail_path: str, metadata: dict) -> str:
         },
         "status": {
             "privacyStatus": "public",
+            "selfDeclaredMadeForKids": False,
         },
     }
 
