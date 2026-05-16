@@ -286,7 +286,7 @@ SOUNDS = [
 
 
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), "history.json")
-HISTORY_LIMIT = 10  # この件数分は同じ音源を繰り返さない
+HISTORY_LIMIT = 28  # 全音源を使い切るまで繰り返さない
 
 
 def _load_history() -> list:
