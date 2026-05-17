@@ -288,7 +288,7 @@ SOUNDS = [
         "label": "Train Underpass",
         "subtitle": "Urban Train Ambiance",
         "ffmpeg_src": "anoisesrc=color=brown,volume=0.5",  # フォールバック用
-        "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "電車高架下_anon.m4a"),
+        "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "電車高架下.m4a"),
         "pixabay": "train station urban city railway",
     },
     {
@@ -308,28 +308,12 @@ SOUNDS = [
         "pixabay": "train station waiting room interior",
     },
     {
-        "type": "summer_park",
-        "label": "Early Summer Park",
-        "subtitle": "Outdoor Nature Sounds",
-        "ffmpeg_src": "anoisesrc=color=pink,highpass=f=200,volume=0.6",
-        "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "初夏の公園_anon.m4a"),
-        "pixabay": "park nature green summer outdoor",
-    },
-    {
-        "type": "station_area",
-        "label": "Train Station",
-        "subtitle": "Busy Station Ambiance",
-        "ffmpeg_src": "anoisesrc=color=white,volume=0.4",
-        "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "駅周辺_anon.m4a"),
-        "pixabay": "train station commuter crowd urban",
-    },
-    {
-        "type": "bus_interior",
-        "label": "Bus Ride",
-        "subtitle": "Relaxing Bus Journey",
+        "type": "night_drive",
+        "label": "Night Drive",
+        "subtitle": "Relaxing Car Interior Sounds",
         "ffmpeg_src": "anoisesrc=color=brown,lowpass=f=600,volume=0.6",
         "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "休日のバス車内_anon.m4a"),
-        "pixabay": "bus interior travel journey commute",
+        "pixabay": "night drive highway car window city lights",
     },
     {
         "type": "electric_fan_real",
@@ -343,7 +327,7 @@ SOUNDS = [
 
 
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), "history.json")
-HISTORY_LIMIT = 34  # 全音源を使い切るまで繰り返さない（28+6録音）
+HISTORY_LIMIT = 33  # 全音源を使い切るまで繰り返さない（28+5録音）
 
 
 def _load_history() -> list:
@@ -1000,9 +984,7 @@ TITLE_TEMPLATES = {
     "train_underpass": "Train Underpass Ambiance {d} 🚃 | Urban White Noise | Focus & Sleep",
     "study_hall":      "Study Hall Ambiance {d} 📚 | Quiet Background Noise | Focus & Deep Work",
     "waiting_room":    "Station Waiting Room Ambiance {d} 🚉 | Background Noise | Study & Focus",
-    "summer_park":     "Early Summer Park Sounds {d} 🌿🐦 | Nature Ambiance | Relax & Focus",
-    "station_area":    "Train Station Ambiance {d} 🚉 | Urban Soundscape | Focus & Productivity",
-    "bus_interior":    "Bus Ride Ambiance {d} 🚌 | Relaxing Journey Sounds | Sleep & Focus",
+    "night_drive":     "Night Drive Ambiance {d} 🚗 | Relaxing Car Sounds | Sleep & Focus",
     "electric_fan_real": "Electric Fan White Noise {d} 🌀 | Real Fan Sound | Deep Sleep & Focus",
 }
 
@@ -1077,7 +1059,6 @@ AFFILIATE_CATEGORY = {
     "river":        "nature",
     "waterfall":    "nature",
     "forest":       "nature",
-    "summer_park":  "nature",
     # 暖炉
     "fireplace":    "fireplace",
     # ファンタジー系
@@ -1097,9 +1078,8 @@ AFFILIATE_CATEGORY = {
     # 移動・旅行系
     "airplane":         "travel",
     "train":            "travel",
-    "bus_interior":     "travel",
+    "night_drive":      "travel",
     "train_underpass":  "travel",
-    "station_area":     "travel",
     "waiting_room":     "travel",
     # ファン・空調系
     "fan":              "fan",
