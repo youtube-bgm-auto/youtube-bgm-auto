@@ -282,11 +282,68 @@ SOUNDS = [
         "ffmpeg_src": "anoisesrc=color=brown,lowpass=f=300,volume=0.7",
         "pixabay": "dark cave underground fantasy stalactite",
     },
+    # ── 実録音源 ──────────────────────────────────────
+    {
+        "type": "train_underpass",
+        "label": "Train Underpass",
+        "subtitle": "Urban Train Ambiance",
+        "ffmpeg_src": "anoisesrc=color=brown,volume=0.5",  # フォールバック用
+        "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "電車高架下_anon.m4a"),
+        "pixabay": "train station urban city railway",
+    },
+    {
+        "type": "study_hall",
+        "label": "Study Hall",
+        "subtitle": "Quiet Study Hall Ambiance",
+        "ffmpeg_src": "anoisesrc=color=pink,volume=0.5",
+        "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "study_hall_anon.m4a"),
+        "pixabay": "library study hall university interior",
+    },
+    {
+        "type": "waiting_room",
+        "label": "Station Waiting Room",
+        "subtitle": "Busy Waiting Room Ambiance",
+        "ffmpeg_src": "anoisesrc=color=white,volume=0.5",
+        "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "theater_anon.m4a"),
+        "pixabay": "train station waiting room interior",
+    },
+    {
+        "type": "summer_park",
+        "label": "Early Summer Park",
+        "subtitle": "Outdoor Nature Sounds",
+        "ffmpeg_src": "anoisesrc=color=pink,highpass=f=200,volume=0.6",
+        "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "初夏の公園_anon.m4a"),
+        "pixabay": "park nature green summer outdoor",
+    },
+    {
+        "type": "station_area",
+        "label": "Train Station",
+        "subtitle": "Busy Station Ambiance",
+        "ffmpeg_src": "anoisesrc=color=white,volume=0.4",
+        "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "駅周辺_anon.m4a"),
+        "pixabay": "train station commuter crowd urban",
+    },
+    {
+        "type": "bus_interior",
+        "label": "Bus Ride",
+        "subtitle": "Relaxing Bus Journey",
+        "ffmpeg_src": "anoisesrc=color=brown,lowpass=f=600,volume=0.6",
+        "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "休日のバス車内_anon.m4a"),
+        "pixabay": "bus interior travel journey commute",
+    },
+    {
+        "type": "electric_fan_real",
+        "label": "Electric Fan",
+        "subtitle": "Real Electric Fan White Noise",
+        "ffmpeg_src": "anoisesrc=color=white,volume=0.5",
+        "audio_file": os.path.join(os.path.dirname(__file__), "recordings", "エレクトリックファン_anon.m4a"),
+        "pixabay": "electric fan bedroom summer cool",
+    },
 ]
 
 
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), "history.json")
-HISTORY_LIMIT = 28  # 全音源を使い切るまで繰り返さない
+HISTORY_LIMIT = 34  # 全音源を使い切るまで繰り返さない（28+6録音）
 
 
 def _load_history() -> list:
@@ -358,27 +415,59 @@ def generate_video(sound: dict, output_path: str, duration: int = 3600,
             ":color=intensity:scale=cbrt:overlap=0.5[sp];"
             "[dark][sp]overlay=0:980[out]"
         )
-        cmd = [
-            "ffmpeg", "-y",
-            *input_args,
-            "-f", "lavfi", "-i", sound["ffmpeg_src"],
-            "-t", str(duration),
-            "-filter_complex", filter_graph,
-            "-map", "[out]", "-map", "1:a",
-            "-c:v", "libx264", "-preset", "ultrafast", "-r", "10",
-            "-c:a", "aac", "-b:a", "192k",
-            output_path,
-        ]
+
+        # 録音音源がある場合はそちらを使用
+        audio_file = sound.get("audio_file")
+        if audio_file and os.path.exists(audio_file):
+            audio_input = ["-stream_loop", "-1", "-i", audio_file]
+            audio_filter = "volume=1.0"
+            cmd = [
+                "ffmpeg", "-y",
+                *input_args,
+                *audio_input,
+                "-t", str(duration),
+                "-filter_complex",
+                f"[1:a]{audio_filter}[a];" + filter_graph.replace("[1:a]", "[a]").replace("[dark][sp]", "[dark][sp]"),
+                "-map", "[out]", "-map", "[a]",
+                "-c:v", "libx264", "-preset", "ultrafast", "-r", "10",
+                "-c:a", "aac", "-b:a", "192k",
+                output_path,
+            ]
+        else:
+            cmd = [
+                "ffmpeg", "-y",
+                *input_args,
+                "-f", "lavfi", "-i", sound["ffmpeg_src"],
+                "-t", str(duration),
+                "-filter_complex", filter_graph,
+                "-map", "[out]", "-map", "1:a",
+                "-c:v", "libx264", "-preset", "ultrafast", "-r", "10",
+                "-c:a", "aac", "-b:a", "192k",
+                output_path,
+            ]
     else:
-        cmd = [
-            "ffmpeg", "-y",
-            "-f", "lavfi", "-i", "color=black:s=1920x1080:r=1",
-            "-f", "lavfi", "-i", sound["ffmpeg_src"],
-            "-t", str(duration),
-            "-c:v", "libx264", "-tune", "stillimage",
-            "-c:a", "aac", "-b:a", "192k",
-            output_path,
-        ]
+        # 録音音源がある場合は黒背景でも使用
+        audio_file = sound.get("audio_file")
+        if audio_file and os.path.exists(audio_file):
+            cmd = [
+                "ffmpeg", "-y",
+                "-f", "lavfi", "-i", "color=black:s=1920x1080:r=1",
+                "-stream_loop", "-1", "-i", audio_file,
+                "-t", str(duration),
+                "-c:v", "libx264", "-tune", "stillimage",
+                "-c:a", "aac", "-b:a", "192k",
+                output_path,
+            ]
+        else:
+            cmd = [
+                "ffmpeg", "-y",
+                "-f", "lavfi", "-i", "color=black:s=1920x1080:r=1",
+                "-f", "lavfi", "-i", sound["ffmpeg_src"],
+                "-t", str(duration),
+                "-c:v", "libx264", "-tune", "stillimage",
+                "-c:a", "aac", "-b:a", "192k",
+                output_path,
+            ]
     subprocess.run(cmd, check=True)
 
 
@@ -907,6 +996,14 @@ TITLE_TEMPLATES = {
     "castle_wind":     "Castle Ramparts Ambiance 🏰🌬️ | {d} Medieval D&D Fantasy Music",
     "space_station":   "Deep Space Station Ambiance 🚀🌌 | {d} Sci-Fi RPG Focus Music",
     "dragon_cave":     "Dragon's Cave Ambiance 🐉🔥 | {d} Dark Fantasy D&D Music",
+    # ── 実録音源 ──
+    "train_underpass": "Train Underpass Ambiance {d} 🚃 | Urban White Noise | Focus & Sleep",
+    "study_hall":      "Study Hall Ambiance {d} 📚 | Quiet Background Noise | Focus & Deep Work",
+    "waiting_room":    "Station Waiting Room Ambiance {d} 🚉 | Background Noise | Study & Focus",
+    "summer_park":     "Early Summer Park Sounds {d} 🌿🐦 | Nature Ambiance | Relax & Focus",
+    "station_area":    "Train Station Ambiance {d} 🚉 | Urban Soundscape | Focus & Productivity",
+    "bus_interior":    "Bus Ride Ambiance {d} 🚌 | Relaxing Journey Sounds | Sleep & Focus",
+    "electric_fan_real": "Electric Fan White Noise {d} 🌀 | Real Fan Sound | Deep Sleep & Focus",
 }
 
 # アフィリエイトリンク（カテゴリ別）
@@ -944,20 +1041,46 @@ AFFILIATE_LINKS = {
 🐉 D&D Monster Manual → https://amzn.to/4nyf7Ak
 🎧 Gaming Headset → https://amzn.to/4fjALG3
 🔈 Bluetooth Speaker → https://amzn.to/4tvbZWX""",
+
+    "study": """\
+🛒 Upgrade your study setup:
+🎧 Noise-Canceling Headphones → https://amzn.to/4wvOyQh
+💡 LED Desk Lamp (USB) → https://amzn.to/4wAAgxM
+🕶️ Blue Light Blocking Glasses → https://amzn.to/4dzFSQb
+🔊 White Noise Machine → https://amzn.to/3R3qsMx""",
+
+    "travel": """\
+🛒 Make every journey more comfortable:
+🛏️ Travel Neck Pillow → https://amzn.to/43doCLH
+🎧 Wireless Earbuds (Noise-Canceling) → https://amzn.to/4ufS1AG
+😴 Travel Eye Mask → https://amzn.to/42CF7Rg
+🔋 Portable Charger → https://amzn.to/XXXXXXX""",
+
+    "fan": """\
+🛒 Create the perfect sleep environment:
+🌀 Tower Fan / Circulator → https://amzn.to/4fb6Sbh
+🌬️ Air Purifier → https://amzn.to/492onGS
+🔊 White Noise Machine → https://amzn.to/3R3qsMx
+😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg""",
 }
 
 # 音源タイプ → アフィリエイトカテゴリのマッピング
 AFFILIATE_CATEGORY = {
-    "fireplace":    "fireplace",
+    # 雨・嵐系
     "rain_light":   "rain",
     "rain_heavy":   "rain",
     "thunderstorm": "rain",
     "rain_roof":    "rain",
-    "ocean":          "nature",
-    "beach":          "nature",
-    "river":          "nature",
-    "waterfall":      "nature",
-    "forest":         "nature",
+    # 自然系
+    "ocean":        "nature",
+    "beach":        "nature",
+    "river":        "nature",
+    "waterfall":    "nature",
+    "forest":       "nature",
+    "summer_park":  "nature",
+    # 暖炉
+    "fireplace":    "fireplace",
+    # ファンタジー系
     "fantasy_library":  "fantasy",
     "medieval_tavern":  "fantasy",
     "enchanted_forest": "fantasy",
@@ -966,6 +1089,22 @@ AFFILIATE_CATEGORY = {
     "castle_wind":      "fantasy",
     "space_station":    "fantasy",
     "dragon_cave":      "fantasy",
+    # 集中・学習系
+    "library":      "study",
+    "cafe":         "study",
+    "paris":        "study",
+    "study_hall":   "study",
+    # 移動・旅行系
+    "airplane":         "travel",
+    "train":            "travel",
+    "bus_interior":     "travel",
+    "train_underpass":  "travel",
+    "station_area":     "travel",
+    "waiting_room":     "travel",
+    # ファン・空調系
+    "fan":              "fan",
+    "electric_fan_real":"fan",
+    # 純粋な睡眠ノイズ → default (white, pink, brown, city)
 }
 
 DESCRIPTION_TEMPLATES = {
