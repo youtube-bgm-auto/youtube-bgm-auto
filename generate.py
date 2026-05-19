@@ -373,14 +373,56 @@ def _save_history(recent: list):
         json.dump({"recent": recent[-HISTORY_LIMIT:]}, f, indent=2)
 
 
-def pick_sound() -> dict:
-    recent = _load_history()
-    candidates = [s for s in SOUNDS if s["type"] not in recent]
-    if not candidates:
-        candidates = SOUNDS  # 全種使い切ったらリセット
-    sound = random.choice(candidates)
-    recent.append(sound["type"])
-    _save_history(recent)
+_FANTASY_KEYS = {
+    "fantasy_library", "medieval_tavern", "enchanted_forest",
+    "ancient_temple", "cozy_cottage", "castle_wind",
+    "space_station", "dragon_cave",
+}
+
+FANTASY_HISTORY_FILE = os.path.join(os.path.dirname(__file__), "fantasy_history.json")
+
+
+def _load_fantasy_history() -> list:
+    import json
+    if os.path.exists(FANTASY_HISTORY_FILE):
+        try:
+            return json.load(open(FANTASY_HISTORY_FILE))["recent"]
+        except Exception:
+            pass
+    return []
+
+
+def _save_fantasy_history(recent: list):
+    import json
+    with open(FANTASY_HISTORY_FILE, "w") as f:
+        json.dump({"recent": recent[-len(_FANTASY_KEYS):]}, f, indent=2)
+
+
+def pick_sound(prefer_fantasy: bool = True) -> dict:
+    """
+    prefer_fantasy=True のとき約50%でファンタジー系を選ぶ。
+    ファンタジーは独自の短い履歴（8種サイクル）で管理するため
+    非ファンタジーより高頻度で登場する。
+    """
+    recent_all = _load_history()
+
+    if prefer_fantasy and random.random() < 0.5:
+        # ファンタジープール（独自の短い履歴）
+        recent_f = _load_fantasy_history()
+        f_pool = [s for s in SOUNDS if s["type"] in _FANTASY_KEYS and s["type"] not in recent_f]
+        if not f_pool:
+            f_pool = [s for s in SOUNDS if s["type"] in _FANTASY_KEYS]
+        sound = random.choice(f_pool)
+        _save_fantasy_history(recent_f + [sound["type"]])
+    else:
+        # 非ファンタジープール（既存の全体履歴）
+        other_pool = [s for s in SOUNDS if s["type"] not in _FANTASY_KEYS and s["type"] not in recent_all]
+        if not other_pool:
+            other_pool = [s for s in SOUNDS if s["type"] not in _FANTASY_KEYS]
+        sound = random.choice(other_pool)
+
+    recent_all.append(sound["type"])
+    _save_history(recent_all)
     return sound
 
 
