@@ -307,7 +307,7 @@ SOUNDS = [
         "label": "Dragon's Cave",
         "subtitle": "Dark Dragon's Cave",
         "ffmpeg_src": "anoisesrc=color=brown,lowpass=f=300,volume=0.7",
-        "pixabay": "dark cave underground fantasy stalactite",
+        "pixabay": "dragon fire fantasy mythical creature",
     },
     # ── 実録音源 ──────────────────────────────────────
     {
@@ -892,14 +892,14 @@ FANTASY_TYPES = {
 
 
 FANTASY_PROMPTS = {
-    "fantasy_library":  "Roger Dean progressive rock album cover art style, surreal ancient library with towering bookshelves made of organic stone, glowing candles, floating books and scrolls, waterfalls cascading from floating islands, vivid teal and amber sky, lush alien vegetation, dreamlike and psychedelic, ultra detailed, no text, 16:9",
-    "medieval_tavern":  "Roger Dean progressive rock album cover art style, surreal organic tavern built into a giant mushroom, warm golden bioluminescent light, floating lanterns, alien plants, vivid colors, dreamlike fantasy landscape, ultra detailed, no text, 16:9",
-    "enchanted_forest": "Roger Dean progressive rock album cover art style, vast surreal enchanted forest with enormous glowing trees, floating islands with cascading waterfalls, vivid emerald and violet sky, alien flora, bioluminescent creatures, ultra detailed, no text, 16:9",
-    "ancient_temple":   "Roger Dean progressive rock album cover art style, ancient temple ruins floating on a sky island, dramatic purple and gold sky, organic stone architecture, glowing mystical carvings, mist below, ultra detailed, no text, 16:9",
-    "cozy_cottage":     "Roger Dean progressive rock album cover art style, cozy round hobbit cottage nestled on a floating island, warm glowing windows, lush impossible garden, pastel sky with twin moons, organic curved architecture, ultra detailed, no text, 16:9",
-    "castle_wind":      "Roger Dean progressive rock album cover art style, dramatic castle perched on floating rock formations, sweeping organic spires, vivid stormy sky with aurora, misty valleys below, epic scale, ultra detailed, no text, 16:9",
-    "space_station":    "Roger Dean progressive rock album cover art style, organic bio-mechanical space station floating among vivid nebulae, curved architecture merging with alien crystal formations, deep violet and cyan galaxy, ultra detailed, no text, 16:9",
-    "dragon_cave":      "Roger Dean progressive rock album cover art style, vast dragon cave with glowing crystal formations, enormous organic stalactites, volcanic amber light, surreal scale, alien rock textures, vivid red and gold tones, ultra detailed, no text, 16:9",
+    "fantasy_library":  "Fantasy illustration of a grand ancient library with towering stone bookshelves reaching into the ceiling, glowing candles floating in mid-air, open books drifting slowly, warm amber and teal magical light, misty atmospheric depth, no people, ultra detailed, no text, 16:9",
+    "medieval_tavern":  "Fantasy illustration of a cozy medieval tavern interior, warm fireplace light, wooden beams and stone walls, barrels and lanterns, mugs on the table, soft golden glow, inviting and atmospheric, no people, ultra detailed, no text, 16:9",
+    "enchanted_forest": "Fantasy illustration of an enchanted forest at twilight, enormous glowing trees with bioluminescent moss, fireflies drifting through mist, violet and emerald sky visible through the canopy, magical atmosphere, no people, ultra detailed, no text, 16:9",
+    "ancient_temple":   "Fantasy illustration of ancient stone temple ruins partially reclaimed by jungle, massive carved pillars, golden light filtering through mist, mystical glowing runes, atmospheric depth, no people, ultra detailed, no text, 16:9",
+    "cozy_cottage":     "Fantasy illustration of a charming stone cottage with a thatched roof, warm glowing windows, lush flower garden, moonlit sky with stars, soft magical atmosphere, inviting and peaceful, no people, ultra detailed, no text, 16:9",
+    "castle_wind":      "Fantasy illustration of a dramatic stone castle on a clifftop at night, torches glowing on the battlements, stormy sky with aurora borealis, misty valleys below, epic cinematic scale, no people, ultra detailed, no text, 16:9",
+    "space_station":    "Fantasy illustration of a futuristic space station floating among vivid nebulae, curved glass corridors, glowing panels, star clusters and galaxies visible outside, deep violet and cyan tones, no people, ultra detailed, no text, 16:9",
+    "dragon_cave":      "Fantasy illustration of a vast ancient cavern glowing with crimson and amber crystals, towering stalactites, golden treasure scattered on the ground, warm magical light, epic cinematic scale, no people, ultra detailed, no text, 16:9",
 }
 
 
