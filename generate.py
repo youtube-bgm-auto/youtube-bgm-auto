@@ -392,45 +392,55 @@ def generate_video(sound: dict, output_path: str, duration: int = 3600,
             input_args = ["-loop", "1", "-i", photo_path]
             scale_filter = "scale=1920:1080"
 
-        filter_graph = (
-            f"[0:v]{scale_filter},boxblur=1:1[bg];"
-            "[bg]drawbox=x=0:y=0:w=iw:h=ih:color=black@0.25:t=fill[dark];"
-            "[1:a]showspectrum=s=1920x100:slide=scroll:saturation=1.5"
-            ":color=intensity:scale=cbrt:overlap=0.5[sp];"
-            "[dark][sp]overlay=0:980[out]"
-        )
+        # 共通エンコード設定（YouTube推奨）
+        video_enc = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+                     "-r", "24", "-pix_fmt", "yuv420p"]
+        audio_enc = ["-c:a", "aac", "-b:a", "256k"]
 
-        # 録音音源がある場合はそちらを使用
         audio_file = sound.get("audio_file")
         if audio_file and os.path.exists(audio_file):
-            audio_input = ["-stream_loop", "-1", "-i", audio_file]
-            audio_filter = "volume=1.0"
+            # 実録音: asplitで音声を分岐（スペクトラム用 + 出力用）
+            filter_complex = (
+                f"[0:v]{scale_filter},boxblur=1:1[bg];"
+                "[bg]drawbox=x=0:y=0:w=iw:h=ih:color=black@0.25:t=fill[dark];"
+                "[1:a]loudnorm=I=-16:TP=-1.5:LRA=11,asplit[aout][aspec];"
+                "[aspec]showspectrum=s=1920x100:slide=scroll:saturation=1.5"
+                ":color=intensity:scale=cbrt:overlap=0.5[sp];"
+                "[dark][sp]overlay=0:980[out]"
+            )
             cmd = [
                 "ffmpeg", "-y",
                 *input_args,
-                *audio_input,
+                "-stream_loop", "-1", "-i", audio_file,
                 "-t", str(duration),
-                "-filter_complex",
-                f"[1:a]{audio_filter}[a];" + filter_graph.replace("[1:a]", "[a]").replace("[dark][sp]", "[dark][sp]"),
-                "-map", "[out]", "-map", "[a]",
-                "-c:v", "libx264", "-preset", "ultrafast", "-r", "10",
-                "-c:a", "aac", "-b:a", "192k",
+                "-filter_complex", filter_complex,
+                "-map", "[out]", "-map", "[aout]",
+                *video_enc, *audio_enc,
                 output_path,
             ]
         else:
+            # 合成音源: asplitで音声を分岐
+            filter_complex = (
+                f"[0:v]{scale_filter},boxblur=1:1[bg];"
+                "[bg]drawbox=x=0:y=0:w=iw:h=ih:color=black@0.25:t=fill[dark];"
+                "[1:a]asplit[aout][aspec];"
+                "[aspec]showspectrum=s=1920x100:slide=scroll:saturation=1.5"
+                ":color=intensity:scale=cbrt:overlap=0.5[sp];"
+                "[dark][sp]overlay=0:980[out]"
+            )
             cmd = [
                 "ffmpeg", "-y",
                 *input_args,
                 "-f", "lavfi", "-i", sound["ffmpeg_src"],
                 "-t", str(duration),
-                "-filter_complex", filter_graph,
-                "-map", "[out]", "-map", "1:a",
-                "-c:v", "libx264", "-preset", "ultrafast", "-r", "10",
-                "-c:a", "aac", "-b:a", "192k",
+                "-filter_complex", filter_complex,
+                "-map", "[out]", "-map", "[aout]",
+                *video_enc, *audio_enc,
                 output_path,
             ]
     else:
-        # 録音音源がある場合は黒背景でも使用
+        # フォールバック: 黒背景
+        audio_enc = ["-c:a", "aac", "-b:a", "256k"]
         audio_file = sound.get("audio_file")
         if audio_file and os.path.exists(audio_file):
             cmd = [
@@ -438,8 +448,8 @@ def generate_video(sound: dict, output_path: str, duration: int = 3600,
                 "-f", "lavfi", "-i", "color=black:s=1920x1080:r=1",
                 "-stream_loop", "-1", "-i", audio_file,
                 "-t", str(duration),
-                "-c:v", "libx264", "-tune", "stillimage",
-                "-c:a", "aac", "-b:a", "192k",
+                "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
+                *audio_enc,
                 output_path,
             ]
         else:
@@ -448,8 +458,8 @@ def generate_video(sound: dict, output_path: str, duration: int = 3600,
                 "-f", "lavfi", "-i", "color=black:s=1920x1080:r=1",
                 "-f", "lavfi", "-i", sound["ffmpeg_src"],
                 "-t", str(duration),
-                "-c:v", "libx264", "-tune", "stillimage",
-                "-c:a", "aac", "-b:a", "192k",
+                "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
+                *audio_enc,
                 output_path,
             ]
     subprocess.run(cmd, check=True)
@@ -793,25 +803,25 @@ FANTASY_PROMPTS = {
 
 
 def _fetch_dalle_image(prompt: str) -> Image.Image | None:
-    """DALL-E 3でイラストを生成して返す。"""
+    """gpt-image-1でイラストを生成して返す。"""
     try:
+        import base64
         from openai import OpenAI
         key = _load_openai_key()
         if not key:
             return None
         client = OpenAI(api_key=key)
         response = client.images.generate(
-            model="dall-e-3",
+            model="gpt-image-1",
             prompt=prompt,
-            size="1792x1024",
-            quality="standard",
+            size="1536x1024",
+            quality="low",
             n=1,
         )
-        img_url = response.data[0].url
-        r = requests.get(img_url, timeout=60)
-        return Image.open(io.BytesIO(r.content)).convert("RGB")
+        img_data = base64.b64decode(response.data[0].b64_json)
+        return Image.open(io.BytesIO(img_data)).convert("RGB")
     except Exception as e:
-        print(f"DALL-E generation failed: {e}")
+        print(f"Image generation failed: {e}")
         return None
 
 
