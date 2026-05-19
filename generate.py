@@ -8,6 +8,10 @@ import requests
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 PIXABAY_KEY = "55697844-994066d6d9f510671090a496b"
+VIDEO_SIZE = "1920x1080"
+VIDEO_W = 1920
+VIDEO_H = 1080
+VIDEO_FPS = 24
 
 # OpenAI APIキーを.envから読み込む
 def _load_openai_key() -> str | None:
@@ -30,10 +34,24 @@ def fetch_background_video(sound: dict, output_path: str, seed: int = 0) -> bool
             "per_page": 20,
             "safesearch": "true",
         }, timeout=15)
+        r.raise_for_status()
         hits = r.json().get("hits", [])
         if not hits:
             return False
-        video = hits[seed % len(hits)]
+
+        def video_score(hit: dict) -> int:
+            videos = hit.get("videos", {})
+            best = max(
+                videos.values(),
+                key=lambda v: int(v.get("width", 0)) * int(v.get("height", 0)),
+                default={},
+            )
+            pixels = int(best.get("width", 0)) * int(best.get("height", 0))
+            duration = int(hit.get("duration", 0))
+            return pixels + min(duration, 60) * 10000
+
+        ranked = sorted(hits, key=video_score, reverse=True)
+        video = ranked[seed % min(len(ranked), 10)]
         videos = video.get("videos", {})
         # 解像度の高いものを優先
         url = (videos.get("large", {}).get("url") or
@@ -42,9 +60,11 @@ def fetch_background_video(sound: dict, output_path: str, seed: int = 0) -> bool
         if not url:
             return False
         resp = requests.get(url, timeout=60, stream=True)
+        resp.raise_for_status()
         with open(output_path, "wb") as f:
             for chunk in resp.iter_content(chunk_size=8192):
-                f.write(chunk)
+                if chunk:
+                    f.write(chunk)
         return True
     except Exception as e:
         print(f"Pixabay video fetch failed: {e}")
@@ -63,12 +83,19 @@ def _fetch_photo(sound: dict, seed: int = 0) -> Image.Image | None:
             "per_page": 20,
             "safesearch": "true",
         }, timeout=15)
+        r.raise_for_status()
         hits = r.json().get("hits", [])
         if not hits:
             return None
-        photo = hits[seed % len(hits)]
+        hits = sorted(
+            hits,
+            key=lambda h: int(h.get("imageWidth", 0)) * int(h.get("imageHeight", 0)),
+            reverse=True,
+        )
+        photo = hits[seed % min(len(hits), 10)]
         img_url = photo.get("largeImageURL") or photo.get("webformatURL")
         img_r = requests.get(img_url, timeout=30)
+        img_r.raise_for_status()
         return Image.open(io.BytesIO(img_r.content)).convert("RGB")
     except Exception as e:
         print(f"Pixabay fetch failed: {e}")
@@ -366,6 +393,32 @@ def save_photo_to_file(sound: dict, path: str, seed: int = 0) -> bool:
     return False
 
 
+def _background_filter(is_video: bool) -> str:
+    """背景素材を16:9の1080pへクロップし、軽く整える。"""
+    filters = [
+        f"scale={VIDEO_W}:{VIDEO_H}:force_original_aspect_ratio=increase",
+        f"crop={VIDEO_W}:{VIDEO_H}",
+        "setsar=1",
+    ]
+    if is_video:
+        filters.append(f"fps={VIDEO_FPS}")
+    return ",".join(filters)
+
+
+def _audio_polish_filter(duration: int, normalize: bool = False) -> str:
+    """長尺BGM用に音量を整え、開始・終了のクリックや唐突さを抑える。"""
+    filters = []
+    if normalize:
+        filters.append("loudnorm=I=-16:TP=-1.5:LRA=11")
+    fade_out_start = max(duration - 4, 0)
+    filters.extend([
+        "afade=t=in:st=0:d=3",
+        f"afade=t=out:st={fade_out_start}:d=4",
+        "alimiter=limit=0.95",
+    ])
+    return ",".join(filters)
+
+
 def generate_video(sound: dict, output_path: str, duration: int = 3600,
                    base_path: str = None, photo_path: str = None):
     """動画を生成する。
@@ -374,12 +427,13 @@ def generate_video(sound: dict, output_path: str, duration: int = 3600,
     - それ以外: 黒画面（フォールバック）
     """
     if base_path and os.path.exists(base_path):
-        loops = round(duration / 3600) - 1
         cmd = [
             "ffmpeg", "-y",
-            "-stream_loop", str(loops),
+            "-stream_loop", "-1",
             "-i", base_path,
+            "-t", str(duration),
             "-c", "copy",
+            "-movflags", "+faststart",
             output_path,
         ]
     elif photo_path and os.path.exists(photo_path):
@@ -387,14 +441,13 @@ def generate_video(sound: dict, output_path: str, duration: int = 3600,
         is_video = photo_path.endswith(".mp4")
         if is_video:
             input_args = ["-stream_loop", "-1", "-i", photo_path]
-            scale_filter = "scale=1920:1080,setsar=1"
         else:
             input_args = ["-loop", "1", "-i", photo_path]
-            scale_filter = "scale=1920:1080"
+        scale_filter = _background_filter(is_video)
 
         # 共通エンコード設定（YouTube推奨）
         video_enc = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-                     "-r", "24", "-pix_fmt", "yuv420p"]
+                     "-r", str(VIDEO_FPS), "-pix_fmt", "yuv420p", "-movflags", "+faststart"]
         audio_enc = ["-c:a", "aac", "-b:a", "256k"]
 
         audio_file = sound.get("audio_file")
@@ -403,8 +456,8 @@ def generate_video(sound: dict, output_path: str, duration: int = 3600,
             filter_complex = (
                 f"[0:v]{scale_filter},boxblur=1:1[bg];"
                 "[bg]drawbox=x=0:y=0:w=iw:h=ih:color=black@0.25:t=fill[dark];"
-                "[1:a]loudnorm=I=-16:TP=-1.5:LRA=11,asplit[aout][aspec];"
-                "[aspec]showspectrum=s=1920x100:slide=scroll:saturation=1.5"
+                f"[1:a]{_audio_polish_filter(duration, normalize=True)},asplit[aout][aspec];"
+                f"[aspec]showspectrum=s={VIDEO_W}x100:slide=scroll:saturation=1.5"
                 ":color=intensity:scale=cbrt:overlap=0.5[sp];"
                 "[dark][sp]overlay=0:980[out]"
             )
@@ -423,8 +476,8 @@ def generate_video(sound: dict, output_path: str, duration: int = 3600,
             filter_complex = (
                 f"[0:v]{scale_filter},boxblur=1:1[bg];"
                 "[bg]drawbox=x=0:y=0:w=iw:h=ih:color=black@0.25:t=fill[dark];"
-                "[1:a]asplit[aout][aspec];"
-                "[aspec]showspectrum=s=1920x100:slide=scroll:saturation=1.5"
+                f"[1:a]{_audio_polish_filter(duration)},asplit[aout][aspec];"
+                f"[aspec]showspectrum=s={VIDEO_W}x100:slide=scroll:saturation=1.5"
                 ":color=intensity:scale=cbrt:overlap=0.5[sp];"
                 "[dark][sp]overlay=0:980[out]"
             )
@@ -443,23 +496,29 @@ def generate_video(sound: dict, output_path: str, duration: int = 3600,
         audio_enc = ["-c:a", "aac", "-b:a", "256k"]
         audio_file = sound.get("audio_file")
         if audio_file and os.path.exists(audio_file):
+            audio_filter = _audio_polish_filter(duration, normalize=True)
             cmd = [
                 "ffmpeg", "-y",
-                "-f", "lavfi", "-i", "color=black:s=1920x1080:r=1",
+                "-f", "lavfi", "-i", f"color=black:s={VIDEO_SIZE}:r=1",
                 "-stream_loop", "-1", "-i", audio_file,
                 "-t", str(duration),
+                "-af", audio_filter,
                 "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
                 *audio_enc,
+                "-movflags", "+faststart",
                 output_path,
             ]
         else:
+            audio_filter = _audio_polish_filter(duration)
             cmd = [
                 "ffmpeg", "-y",
-                "-f", "lavfi", "-i", "color=black:s=1920x1080:r=1",
+                "-f", "lavfi", "-i", f"color=black:s={VIDEO_SIZE}:r=1",
                 "-f", "lavfi", "-i", sound["ffmpeg_src"],
                 "-t", str(duration),
+                "-af", audio_filter,
                 "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
                 *audio_enc,
+                "-movflags", "+faststart",
                 output_path,
             ]
     subprocess.run(cmd, check=True)

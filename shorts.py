@@ -137,14 +137,17 @@ def _make_shorts_frame(sound: dict) -> str:
 def generate_short(sound: dict, output_path: str):
     """59秒の縦型Shorts動画を生成する。"""
     frame_path = _make_shorts_frame(sound)
+    fade_out_start = max(DURATION - 3, 0)
     cmd = [
         "ffmpeg", "-y",
         "-loop", "1", "-i", frame_path,
         "-f", "lavfi", "-i", sound["ffmpeg_src"],
         "-t", str(DURATION),
         "-vf", f"scale={W}:{H}",
+        "-af", f"afade=t=in:st=0:d=1.5,afade=t=out:st={fade_out_start}:d=3,alimiter=limit=0.95",
         "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "128k",
+        "-movflags", "+faststart",
         output_path,
     ]
     subprocess.run(cmd, check=True, capture_output=True)
