@@ -979,22 +979,99 @@ def _generate_fantasy_thumbnail(sound: dict, output_path: str, photo_seed: int, 
     img = Image.alpha_composite(img, grad)
     draw = ImageDraw.Draw(img)
 
-    # メインタイトル（下部・シンプルに）
+    # メインタイトル（フォント自動縮小・縁取り付き）
+    FONTS_DIR = os.path.join(os.path.dirname(__file__), "fonts")
     t1 = info["label1"]
+    font_xl = _fit_font(f"{FONTS_DIR}/Cinzel-Bold.ttf", t1, max_width=1200, max_size=96)
     b1 = draw.textbbox((0, 0), t1, font=font_xl)
     w1 = b1[2] - b1[0]
-    # 影
-    draw.text((cx - w1 // 2 + 3, 598), t1, fill=(0, 0, 0, 180), font=font_xl)
-    # 本文（白）
-    draw.text((cx - w1 // 2, 595), t1, fill=(255, 255, 255), font=font_xl)
+    _draw_outlined_text(draw, (cx - w1 // 2, 590), t1,
+                        font=font_xl, fill=(255, 255, 255), outline=(0, 0, 0), stroke=3)
 
-    # 時間ラベル（右下・控えめ）
-    b3 = draw.textbbox((0, 0), duration_label, font=font_sm)
-    bw = b3[2] - b3[0]
-    draw.text((1280 - bw - 18, 688), duration_label,
-              fill=(210, 210, 210, 200), font=font_sm)
+    # 時間ラベル（左下）
+    try:
+        font_sm = ImageFont.truetype(f"{FONTS_DIR}/Cinzel-Regular.ttf", 26)
+    except Exception:
+        font_sm = ImageFont.load_default()
+    _draw_outlined_text(draw, (20, 688), duration_label,
+                        font=font_sm, fill=(210, 210, 210), outline=(0, 0, 0), stroke=2)
 
-    img.convert("RGB").save(output_path)
+    # SleepScapeブランドバッジ（右下）
+    rgb_img = img.convert("RGB")
+    _draw_brand_badge(rgb_img)
+    rgb_img.save(output_path)
+
+
+def _fit_font(font_path: str, text: str, max_width: int, max_size: int, min_size: int = 32) -> ImageFont.FreeTypeFont:
+    """テキストがmax_width以内に収まるフォントサイズを返す。"""
+    size = max_size
+    while size >= min_size:
+        try:
+            font = ImageFont.truetype(font_path, size)
+        except Exception:
+            return ImageFont.load_default()
+        dummy = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+        w = dummy.textbbox((0, 0), text, font=font)[2]
+        if w <= max_width:
+            return font
+        size -= 4
+    return ImageFont.truetype(font_path, min_size)
+
+
+def _draw_outlined_text(draw: ImageDraw.ImageDraw, xy: tuple, text: str,
+                        font, fill=(255, 255, 255), outline=(0, 0, 0), stroke: int = 3):
+    """縁取り付きテキストを描画する。"""
+    x, y = xy
+    for dx in range(-stroke, stroke + 1):
+        for dy in range(-stroke, stroke + 1):
+            if dx != 0 or dy != 0:
+                draw.text((x + dx, y + dy), text, font=font, fill=outline)
+    draw.text((x, y), text, font=font, fill=fill)
+
+
+def _draw_brand_badge(img: Image.Image):
+    """右上にSleepScapeウォーターマークを描画する（背景なし・縁取りテキスト）。"""
+    try:
+        font_text = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 44)
+        font_icon = ImageFont.truetype("/System/Library/Fonts/Apple Color Emoji.ttc", 48)
+    except Exception:
+        font_text = ImageFont.load_default()
+        font_icon = font_text
+
+    icon  = "🌙"
+    label = "SleepScape"
+    margin = 20
+    gap = 8
+
+    dummy = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    ib = dummy.textbbox((0, 0), icon,  font=font_icon)
+    tb = dummy.textbbox((0, 0), label, font=font_text)
+    iw, ih = ib[2] - ib[0], ib[3] - ib[1]
+    tw, th = tb[2] - tb[0], tb[3] - tb[1]
+
+    total_w = iw + gap + tw
+    # 右上：x = 1280 - total_w - margin, y = margin
+    x = 1280 - total_w - margin
+    y = margin
+
+    draw = ImageDraw.Draw(img)
+    # 🌙アイコン（右上）
+    draw.text((x, y + (th - ih) // 2), icon, font=font_icon, embedded_color=True)
+    # "SleepScape" テキスト（縁取り付き）
+    _draw_outlined_text(draw, (x + iw + gap, y), label,
+                        font=font_text, fill=(255, 255, 255), outline=(0, 0, 0), stroke=3)
+
+
+# 音源タイプ別の絵文字アイコン（サムネイル用）
+SOUND_ICONS = {
+    "white": "🌬️", "pink": "🌸", "brown": "🌲",
+    "rain_light": "🌧️", "rain_heavy": "⛈️", "thunderstorm": "🌩️", "rain_roof": "🏠",
+    "ocean": "🌊", "beach": "🏖️", "river": "🏞️", "waterfall": "💧", "forest": "🌲",
+    "city": "🌃", "paris": "☕", "cafe": "☕", "library": "📚",
+    "fan": "🌀", "airplane": "✈️", "train": "🚂", "fireplace": "🔥",
+    "train_underpass": "🚃", "study_hall": "📚", "waiting_room": "🚉",
+    "night_drive": "🚗", "electric_fan_real": "🌀",
+}
 
 
 def generate_thumbnail(sound: dict, output_path: str, photo_seed: int = 0, duration_label: str = "1 HOUR"):
@@ -1005,7 +1082,6 @@ def generate_thumbnail(sound: dict, output_path: str, photo_seed: int = 0, durat
     # 写真をPixabayから取得、失敗時はイラスト生成にフォールバック
     photo = _fetch_photo(sound, seed=photo_seed)
     if photo:
-        # 1280x720にクロップ（中央）
         pw, ph = photo.size
         scale = max(1280 / pw, 720 / ph)
         nw, nh = int(pw * scale), int(ph * scale)
@@ -1029,34 +1105,44 @@ def generate_thumbnail(sound: dict, output_path: str, photo_seed: int = 0, durat
     # 下部グラデーション帯
     overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay)
-    for i in range(200):
-        alpha = int(200 * (i / 200) ** 1.5)
-        od.line([(0, 520 + i), (1280, 520 + i)], fill=(0, 0, 0, alpha))
+    for i in range(220):
+        alpha = int(210 * (i / 220) ** 1.5)
+        od.line([(0, 500 + i), (1280, 500 + i)], fill=(0, 0, 0, alpha))
     img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
 
-    draw = ImageDraw.Draw(img)
+    FONT_PATH = "/System/Library/Fonts/Helvetica.ttc"
 
-    try:
-        font_large = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 88)
-        font_small = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 34)
-    except Exception:
-        font_large = ImageFont.load_default()
-        font_small = ImageFont.load_default()
-
-    # タイトル
+    # ① メインタイトル（フォント自動縮小・縁取り付き）
     text1 = sound["label"].upper()
-    bbox1 = draw.textbbox((0, 0), text1, font=font_large)
+    font_large = _fit_font(FONT_PATH, text1, max_width=1180, max_size=88)
+    bbox1 = ImageDraw.Draw(img).textbbox((0, 0), text1, font=font_large)
     w1 = bbox1[2] - bbox1[0]
-    # 影
-    draw.text(((1280 - w1) / 2 + 2, 572), text1, fill=(0, 0, 0, 180), font=font_large)
-    draw.text(((1280 - w1) / 2, 570), text1, fill=(255, 255, 255), font=font_large)
+    draw = ImageDraw.Draw(img)
+    _draw_outlined_text(draw, ((1280 - w1) // 2, 555), text1,
+                        font=font_large, fill=(255, 255, 255), outline=(0, 0, 0), stroke=3)
 
-    # サブテキスト
-    text2 = f"{duration_label}  ·  Baby Sleep  ·  Focus  ·  Relax"
+    # ② 絵文字アイコン（右寄せ・大きく）
+    icon = SOUND_ICONS.get(sound["type"], "🎵")
+    try:
+        font_icon = ImageFont.truetype("/System/Library/Fonts/Apple Color Emoji.ttc", 72)
+        ib = draw.textbbox((0, 0), icon, font=font_icon)
+        draw.text((1280 - (ib[2] - ib[0]) - 24, 530), icon, font=font_icon, embedded_color=True)
+    except Exception:
+        pass  # 絵文字フォントが無ければスキップ
+
+    # ③ サブテキスト（縁取り付き）
+    try:
+        font_small = ImageFont.truetype(FONT_PATH, 32)
+    except Exception:
+        font_small = ImageFont.load_default()
+    text2 = f"{duration_label}  ·  Sleep  ·  Focus  ·  Relax"
     bbox2 = draw.textbbox((0, 0), text2, font=font_small)
     w2 = bbox2[2] - bbox2[0]
-    draw.text(((1280 - w2) / 2 + 1, 671), text2, fill=(0, 0, 0, 160), font=font_small)
-    draw.text(((1280 - w2) / 2, 670), text2, fill=(210, 225, 240), font=font_small)
+    _draw_outlined_text(draw, ((1280 - w2) // 2, 655), text2,
+                        font=font_small, fill=(210, 225, 240), outline=(0, 0, 0), stroke=2)
+
+    # ④ SleepScapeブランドバッジ（右下）
+    _draw_brand_badge(img)
 
     img.save(output_path)
 
