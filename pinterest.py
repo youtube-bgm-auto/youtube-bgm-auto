@@ -15,14 +15,16 @@ from openai import OpenAI
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                     handlers=[logging.StreamHandler(sys.stdout)])
 
-DIR         = os.path.dirname(__file__)
-ENV_FILE    = os.path.join(DIR, ".env")
+DIR          = os.path.dirname(__file__)
+ENV_FILE     = os.path.join(DIR, ".env")
 HISTORY_FILE = os.path.join(DIR, "pinterest_history.json")
-OUTPUT_DIR  = os.path.join(DIR, "pins_output")
+OUTPUT_DIR   = os.path.expanduser(
+    "~/Library/Mobile Documents/com~apple~CloudDocs/SleepScape Pins"
+)
 FONT_BOLD   = os.path.join(DIR, "fonts", "Cinzel-Bold.ttf")
 FONT_REG    = "/System/Library/Fonts/Helvetica.ttc"
 FONT_EMOJI  = "/System/Library/Fonts/Apple Color Emoji.ttc"
-HISTORY_LIMIT = 10
+HISTORY_LIMIT = 20
 
 
 # ─── .env 読み込み ──────────────────────────────────────────────
@@ -332,6 +334,173 @@ PRODUCTS = [
             "soft morning light flooding the room, fresh and clean atmosphere, "
             "no people, Japandi interior aesthetic, ultra detailed, "
             "Pinterest minimal bedroom inspo, vertical"
+        ),
+    },
+    # ── Skincare / Wellness ──────────────────────────────────────
+    {
+        "id": "overnight_face_mask",
+        "title": "Overnight Sleeping Mask",
+        "headline": "Wake up with\nglowing skin",
+        "description": (
+            "Apply before bed and let your skin recover overnight. "
+            "A hydrating sleeping mask works while you sleep — no extra steps, no extra time.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3R3qsMx\n\n"
+            "#SkincareTips #OvernightMask #GlowingSkin #SleepScape #BeautyRoutine #SleepBeauty"
+        ),
+        "dalle_prompt": (
+            "luxurious skincare flat lay on a white marble surface, "
+            "elegant glass skincare jar with cream, fresh rose petals, "
+            "small dropper bottle of serum, soft green eucalyptus leaves, "
+            "warm bathroom morning light, clean and beautiful, no people, "
+            "high-end beauty editorial photography, Pinterest skincare aesthetic, vertical"
+        ),
+    },
+    {
+        "id": "silk_pillowcase",
+        "title": "Silk Pillowcase",
+        "headline": "Better sleep.\nBetter skin.\nBetter hair.",
+        "description": (
+            "A 100% mulberry silk pillowcase reduces friction on your skin and hair while you sleep. "
+            "Dermatologist-recommended for sensitive skin and anti-aging.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/42CF7Rg\n\n"
+            "#SilkPillowcase #SkincareWhileYouSleep #HairCare #SleepScape #DermatologistTips"
+        ),
+        "dalle_prompt": (
+            "close-up of a luxurious bed with shimmering ivory silk pillowcase, "
+            "soft morning light creating gentle reflections on the silk texture, "
+            "single fresh white gardenia flower placed on the pillow, "
+            "crisp white duvet, elegant and serene, no people, "
+            "luxury bedroom editorial photography, Pinterest luxury bedroom, vertical"
+        ),
+    },
+    {
+        "id": "humidifier_bedroom",
+        "title": "Cool Mist Humidifier",
+        "headline": "Your skin needs\nhumidity to heal",
+        "description": (
+            "Dry air causes skin irritation, chapped lips, and poor sleep. "
+            "A bedroom humidifier keeps moisture levels optimal — better for your skin, "
+            "your breathing, and your sleep quality.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3R3qsMx\n\n"
+            "#Humidifier #DrySkin #SkincareTips #SleepScape #BedroomWellness"
+        ),
+        "dalle_prompt": (
+            "serene night bedroom, elegant white humidifier emitting soft cool mist, "
+            "moonlight through sheer curtains, small monstera plant and pebbles beside it, "
+            "warm amber bedside lamp glow, calm and atmospheric, no people, "
+            "wellness bedroom aesthetic, ultra detailed, Pinterest bedroom wellness, vertical"
+        ),
+    },
+    # ── Meditation / Mindfulness ────────────────────────────────
+    {
+        "id": "meditation_cushion",
+        "title": "Meditation Cushion",
+        "headline": "Sit comfortably.\nThink clearly.",
+        "description": (
+            "A proper meditation cushion makes all the difference. "
+            "Firm support for long sits, beautiful design for your space.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3R3qsMx\n\n"
+            "#Meditation #MindfulLiving #SleepScape #MorningRoutine #Mindfulness"
+        ),
+        "dalle_prompt": (
+            "peaceful meditation corner in a minimal room, round linen meditation cushion "
+            "on a natural jute mat, small singing bowl and wooden incense holder, "
+            "soft morning light through a rice paper screen, "
+            "potted bamboo plant in corner, serene and zen, no people, "
+            "zen interior aesthetic, ultra detailed, Pinterest meditation space, vertical"
+        ),
+    },
+    {
+        "id": "singing_bowl",
+        "title": "Tibetan Singing Bowl",
+        "headline": "Reset your mind\nin 60 seconds",
+        "description": (
+            "A Tibetan singing bowl for meditation, stress relief, and sleep preparation. "
+            "The resonating tone calms your nervous system instantly.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3R3qsMx\n\n"
+            "#SingingBowl #Meditation #StressRelief #SleepScape #SoundHealing #Mindfulness"
+        ),
+        "dalle_prompt": (
+            "beautiful Tibetan singing bowl on a dark wooden surface, "
+            "wooden mallet resting beside it, dried sage bundle and crystal nearby, "
+            "soft moody candlelight from behind, dramatic yet peaceful atmosphere, "
+            "no people, dark zen aesthetic, editorial photography, "
+            "Pinterest meditation aesthetic, vertical"
+        ),
+    },
+    # ── Smart Home / Lighting ────────────────────────────────────
+    {
+        "id": "smart_bulb_sleep",
+        "title": "Smart Sleep Light Bulb",
+        "headline": "Light that tells\nyour brain it's bedtime",
+        "description": (
+            "Smart bulbs that automatically shift to warm amber light in the evening, "
+            "reducing blue light exposure and naturally preparing your body for sleep.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3R3qsMx\n\n"
+            "#SmartHome #SleepHygiene #BlueLight #SleepScape #SmartLighting #SleepTips"
+        ),
+        "dalle_prompt": (
+            "cozy living room at dusk bathed in warm amber smart lighting, "
+            "comfortable sofa with linen cushions, open book and mug on coffee table, "
+            "warm glowing lamps creating a perfect evening wind-down atmosphere, "
+            "no people, smart home lifestyle photography, warm golden tones, "
+            "ultra detailed, Pinterest cozy home evening, vertical"
+        ),
+    },
+    {
+        "id": "sunrise_alarm_clock",
+        "title": "Sunrise Alarm Clock",
+        "headline": "Wake up naturally.\nFeel amazing.",
+        "description": (
+            "A sunrise simulation alarm clock gradually brightens your room "
+            "before your alarm goes off — waking you at the lightest sleep phase "
+            "so you feel refreshed, not groggy.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3R3qsMx\n\n"
+            "#SunriseAlarm #BetterMornings #SleepScape #WakeUpRefreshed #SleepTips"
+        ),
+        "dalle_prompt": (
+            "beautiful bedroom at dawn, soft golden sunrise light gradually illuminating "
+            "the room through sheer curtains, pristine white bedding, "
+            "small rounded alarm clock glowing warmly on nightstand, "
+            "peaceful and hopeful morning atmosphere, no people, "
+            "morning lifestyle editorial photography, Pinterest morning routine, vertical"
+        ),
+    },
+    # ── Cozy / Reading ───────────────────────────────────────────
+    {
+        "id": "electric_kettle",
+        "title": "Variable Temp Electric Kettle",
+        "headline": "The perfect cup\nbefore bed",
+        "description": (
+            "Chamomile, valerian, or passionflower tea before bed can significantly improve sleep quality. "
+            "A variable temperature kettle brews every tea perfectly.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3R3qsMx\n\n"
+            "#BedtimeTea #SleepTips #SleepScape #TeaTime #NightRoutine #SleepNaturally"
+        ),
+        "dalle_prompt": (
+            "cozy kitchen counter at night, sleek matte black electric kettle "
+            "with steam rising, a handmade ceramic mug ready beside it, "
+            "small wooden tea chest with loose leaf teas, warm under-cabinet lighting, "
+            "no people, moody kitchen aesthetic, editorial quality, "
+            "Pinterest cozy kitchen night, vertical"
+        ),
+    },
+    {
+        "id": "book_light",
+        "title": "Rechargeable Book Light",
+        "headline": "Read till you're\nsleepy — guilt free",
+        "description": (
+            "A warm-toned rechargeable book light lets you read in bed "
+            "without disturbing your partner or exposing yourself to harsh white light before sleep.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3R3qsMx\n\n"
+            "#ReadingInBed #BookLight #NightReading #SleepScape #BookLovers #NightRoutine"
+        ),
+        "dalle_prompt": (
+            "intimate bedtime reading scene, open novel resting on crisp white sheets, "
+            "warm amber clip-on reading light illuminating just the pages, "
+            "dark cozy bedroom surroundings, hot chocolate on the nightstand, "
+            "no people, hygge bedtime aesthetic, moody and warm, "
+            "ultra detailed, Pinterest reading in bed, vertical"
         ),
     },
 ]
