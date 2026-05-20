@@ -1,4 +1,5 @@
 #!/bin/bash
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 cd "/Users/win/Library/Mobile Documents/com~apple~CloudDocs/code/youtube-bgm-auto"
 
 # 前回実行から48時間経過しているか確認

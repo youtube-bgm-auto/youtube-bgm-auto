@@ -112,6 +112,13 @@ def main():
         _save_state({"done": done})
         logging.info(f"Fantasy queue: {len(done)}/{len(FANTASY_QUEUE)} done.")
 
+    except Exception as e:
+        logging.error(f"Failed: {e}")
+        # 失敗しても次回は次の音源に進む
+        done.append(sound_type)
+        _save_state({"done": done})
+        logging.info(f"Marked {sound_type} as done (failed) to avoid repeat. Retry manually if needed.")
+
     finally:
         for path in [video_1h, video_8h, thumb_1h, thumb_8h, bg_video]:
             if path and os.path.exists(path):
