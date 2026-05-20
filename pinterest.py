@@ -1,36 +1,31 @@
 """
-Pinterest自動ピン投稿 (SleepScapeDaily)
+Pinterest ピン素材自動生成 (SleepScapeDaily)
 - 商品カタログからランダム選択
-- DALL-Eで縦長ライフスタイル画像生成 (1024x1536)
+- DALL-E (gpt-image-1) で高品質縦長ライフスタイル画像生成 (1024x1536)
 - テキストオーバーレイ + SleepScapeブランディング
-- Pinterest API v5でボードに自動投稿
-- 履歴管理で重複防止
+- 画像 + 説明文を pins_output/ に保存 → Pinterest に手動投稿
+- 履歴管理で重複防止 (10件クールダウン)
 """
 
-import os, json, base64, io, random, time, sys, webbrowser, pickle, urllib.parse, logging
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import os, json, base64, io, random, sys, logging
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
-import requests
 from openai import OpenAI
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                     handlers=[logging.StreamHandler(sys.stdout)])
 
-DIR          = os.path.dirname(__file__)
-ENV_FILE     = os.path.join(DIR, ".env")
-TOKEN_FILE   = os.path.join(DIR, "token_pinterest.pickle")
+DIR         = os.path.dirname(__file__)
+ENV_FILE    = os.path.join(DIR, ".env")
 HISTORY_FILE = os.path.join(DIR, "pinterest_history.json")
-FONT_BOLD    = os.path.join(DIR, "fonts", "Cinzel-Bold.ttf")
-FONT_REG     = "/System/Library/Fonts/Helvetica.ttc"
-FONT_EMOJI   = "/System/Library/Fonts/Apple Color Emoji.ttc"
-
-PINTEREST_BASE = "https://api.pinterest.com/v5"
-REDIRECT_URI   = "https://localhost/"
-HISTORY_LIMIT  = 10   # この件数は連続して選ばない
+OUTPUT_DIR  = os.path.join(DIR, "pins_output")
+FONT_BOLD   = os.path.join(DIR, "fonts", "Cinzel-Bold.ttf")
+FONT_REG    = "/System/Library/Fonts/Helvetica.ttc"
+FONT_EMOJI  = "/System/Library/Fonts/Apple Color Emoji.ttc"
+HISTORY_LIMIT = 10
 
 
-# ─── .env 読み込み ─────────────────────────────────────────────
+# ─── .env 読み込み ──────────────────────────────────────────────
 def _load_env() -> dict:
     env = {}
     if os.path.exists(ENV_FILE):
@@ -49,18 +44,19 @@ PRODUCTS = [
     {
         "id": "white_noise_machine",
         "title": "White Noise Machine",
-        "headline": "The best sleep of your life\nstarts here",
+        "headline": "The best sleep of\nyour life starts here",
         "description": (
-            "Drown out distractions and sleep deeper with a white noise machine. "
-            "Perfect for light sleepers, city dwellers, and anyone who struggles to unwind. "
-            "🌙 SleepScape recommends it."
+            "Struggling to fall asleep? A white noise machine drowns out distractions "
+            "and creates the perfect sleep environment — every single night.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3R3qsMx\n\n"
+            "#WhiteNoise #SleepBetter #SleepTips #BedtimeRoutine #SleepScape"
         ),
-        "amazon_url": "https://amzn.to/3R3qsMx",
-        "themes": ["sleep", "rain", "fan"],
         "dalle_prompt": (
-            "cozy minimalist bedroom at night, soft moonlight through sheer curtains, "
-            "perfectly made bed with fluffy pillows, warm ambient nightstand lamp, "
-            "peaceful and serene, no people, Pinterest lifestyle aesthetic, vertical composition"
+            "cozy minimalist bedroom at night, soft warm glow from a small nightstand lamp, "
+            "plush white bedding perfectly arranged, sheer curtains with faint moonlight, "
+            "a glass of water on the nightstand, peaceful and inviting atmosphere, "
+            "no people, high-end interior photography style, warm neutral tones, "
+            "ultra sharp, Pinterest lifestyle aesthetic, vertical portrait"
         ),
     },
     {
@@ -68,16 +64,16 @@ PRODUCTS = [
         "title": "Sleep Headphones",
         "headline": "Fall asleep to\nyour favorite sounds",
         "description": (
-            "Ultra-soft Bluetooth headphones designed for sleeping. "
-            "Thin speakers that stay comfortable all night — perfect for side sleepers and travelers. "
-            "🎧 Pair with SleepScape ambient sounds."
+            "These ultra-thin Bluetooth sleep headphones stay comfortable all night — "
+            "even for side sleepers. Pair them with ambient sounds for the perfect sleep experience.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/4fjALG3\n\n"
+            "#SleepHeadphones #AmbientSounds #SleepScape #BetterSleep #SleepHacks"
         ),
-        "amazon_url": "https://amzn.to/4fjALG3",
-        "themes": ["sleep", "study", "travel"],
         "dalle_prompt": (
-            "dreamy cozy bedroom at dusk, soft pillows and chunky knit blanket, "
-            "warm golden lamp light, peaceful and inviting, no people, "
-            "minimalist Pinterest lifestyle aesthetic, vertical"
+            "dreamy cozy bedroom in golden hour light, soft chunky knit blanket draped over "
+            "crisp white pillows, warm amber lamp glow, small stack of books on nightstand, "
+            "calm and inviting, no people, editorial bedroom photography, "
+            "warm earthy tones, ultra detailed, Pinterest cozy bedroom aesthetic, vertical"
         ),
     },
     {
@@ -85,16 +81,17 @@ PRODUCTS = [
         "title": "Blackout Sleep Mask",
         "headline": "Total darkness.\nTotal rest.",
         "description": (
-            "Block 100% of light for deeper, longer sleep. "
-            "Adjustable silk-feel eye mask — great for travel, night shifts, or bright bedrooms. "
-            "😴 Sleep like you mean it."
+            "Block 100% of light and wake up completely rested. "
+            "This adjustable silk-feel eye mask is a game changer for travelers and light-sensitive sleepers.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/42CF7Rg\n\n"
+            "#SleepMask #BlackoutMask #SleepBetter #TravelSleep #SleepScape"
         ),
-        "amazon_url": "https://amzn.to/42CF7Rg",
-        "themes": ["sleep", "travel"],
         "dalle_prompt": (
-            "luxurious minimalist bedroom, soft silk bedding in neutral tones, "
-            "gentle morning light barely peeking through blackout curtains, "
-            "calm and restful atmosphere, no people, Pinterest bedroom aesthetic, vertical"
+            "luxurious minimalist bedroom, smooth silk bedding in ivory and soft grey, "
+            "subtle morning light filtering through blackout curtains, "
+            "fresh flowers on the nightstand, serene and calm atmosphere, "
+            "no people, luxury hotel room aesthetic, soft diffused light, "
+            "ultra detailed, Pinterest bedroom inspo, vertical"
         ),
     },
     {
@@ -102,33 +99,35 @@ PRODUCTS = [
         "title": "Weighted Blanket",
         "headline": "Like a hug that\nhelps you sleep",
         "description": (
-            "Reduce anxiety and improve sleep quality with a weighted blanket. "
-            "Science-backed comfort that works for adults and kids alike. "
-            "🛏️ Feel the difference from night one."
+            "Reduce anxiety and fall asleep faster with a weighted blanket. "
+            "Science-backed comfort that works from the very first night.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3YbTKDV\n\n"
+            "#WeightedBlanket #AnxietyRelief #SleepBetter #CozyHome #SleepScape"
         ),
-        "amazon_url": "https://amzn.to/3YbTKDV",
-        "themes": ["sleep", "cozy"],
         "dalle_prompt": (
-            "ultra cozy bedroom corner, chunky knit blanket draped over a comfortable chair, "
-            "warm fairy string lights, steaming mug on small wooden table, "
-            "autumn evening atmosphere, no people, Pinterest cozy hygge aesthetic, vertical"
+            "ultra cozy autumn bedroom corner, chunky knit weighted blanket draped over "
+            "a plush reading chair, warm string lights on the wall, steaming ceramic mug "
+            "on a small wooden side table, fallen leaves outside the window, "
+            "warm amber and terracotta tones, no people, hygge aesthetic, "
+            "ultra detailed, Pinterest cozy fall bedroom, vertical"
         ),
     },
     {
         "id": "pillow_speaker",
         "title": "Pillow Speaker",
-        "headline": "Ambient sound\nwithout disturbing anyone",
+        "headline": "8 hours of ambient\nsound, just for you",
         "description": (
-            "Ultra-thin speaker that fits inside your pillowcase. "
-            "Listen to sleep sounds all night at a low volume only you can hear. "
-            "🔈 Perfect with SleepScape 8-hour streams."
+            "An ultra-thin speaker that fits inside your pillowcase. "
+            "Listen to SleepScape ambient sounds all night at low volume — "
+            "without disturbing anyone next to you.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/4doJIvg\n\n"
+            "#PillowSpeaker #AmbientSound #SleepScape #SleepTech #BetterSleep"
         ),
-        "amazon_url": "https://amzn.to/4doJIvg",
-        "themes": ["sleep"],
         "dalle_prompt": (
-            "minimalist white bedroom, plush pillow arrangement on clean white bedding, "
-            "soft morning diffused light, peaceful and clean aesthetic, "
-            "no people, Pinterest minimal bedroom aesthetic, vertical"
+            "serene minimalist bedroom, pristine white pillow arrangement on clean linen sheets, "
+            "soft diffused morning light, small succulent plant on windowsill, "
+            "peaceful and airy atmosphere, no people, Scandinavian interior style, "
+            "soft whites and natural tones, ultra sharp, Pinterest minimal bedroom, vertical"
         ),
     },
     # ── Study / Focus ───────────────────────────────────────────
@@ -137,50 +136,54 @@ PRODUCTS = [
         "title": "Noise-Canceling Headphones",
         "headline": "Deep focus starts\nwith silence",
         "description": (
-            "Enter a flow state and tune out the world. "
-            "Premium noise-canceling headphones for studying, working from home, or unwinding. "
-            "🎧 Elevate every study session."
+            "Enter a flow state and get more done. "
+            "Premium noise-canceling headphones for studying, working from home, or unwinding "
+            "with SleepScape ambient sounds.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/4wvOyQh\n\n"
+            "#NoiseCanceling #StudyTips #FocusMode #WorkFromHome #SleepScape"
         ),
-        "amazon_url": "https://amzn.to/4wvOyQh",
-        "themes": ["study", "fantasy", "travel"],
         "dalle_prompt": (
-            "aesthetic study desk setup, warm wooden desk with open notebook, "
-            "steaming coffee cup, stack of books, cozy home library in background, "
-            "golden hour light through window, no people, Pinterest study aesthetic, vertical"
+            "aesthetic home study desk setup, warm wooden desk surface, open notebook with neat handwriting, "
+            "steaming pour-over coffee, stack of books, small potted plant, "
+            "golden hour light streaming through a window, dust particles in the light beam, "
+            "no people, editorial study aesthetic, warm tones, ultra detailed, "
+            "Pinterest desk setup inspo, vertical"
         ),
     },
     {
         "id": "led_desk_lamp",
         "title": "LED Desk Lamp",
-        "headline": "Light up\nyour focus zone",
+        "headline": "Light up your\nfocus zone",
         "description": (
-            "Adjustable brightness and color temperature to match your mood and time of day. "
-            "Easy on your eyes during long study sessions. "
-            "💡 Your desk deserves better light."
+            "Adjustable brightness and color temperature LED lamp — easy on your eyes "
+            "during long study or work sessions. Your desk deserves better light.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/4wAAgxM\n\n"
+            "#DeskSetup #StudyRoom #DeskLamp #ProductivityTips #SleepScape"
         ),
-        "amazon_url": "https://amzn.to/4wAAgxM",
-        "themes": ["study"],
         "dalle_prompt": (
-            "cozy minimalist study corner at night, warm amber desk lamp glowing, "
-            "open books and planner on wooden desk, pencil cup and small plant, "
-            "focused productive night study atmosphere, no people, Pinterest desk aesthetic, vertical"
+            "cozy study corner at night, warm amber desk lamp casting a beautiful glow, "
+            "open planner and fountain pen, small cactus, wooden desk organizer, "
+            "dark moody background contrasting warm light pool, "
+            "no people, moody study aesthetic, editorial quality, "
+            "ultra sharp, Pinterest night study vibes, vertical"
         ),
     },
     {
         "id": "blue_light_glasses",
         "title": "Blue Light Blocking Glasses",
-        "headline": "Protect your eyes.\nSleep better.",
+        "headline": "Work late.\nStill sleep well.",
         "description": (
-            "Reduce digital eye strain and improve your sleep quality. "
-            "Stylish frames that block harmful blue light from screens. "
-            "🕶️ Work late without wrecking your sleep."
+            "Stylish blue light blocking glasses reduce digital eye strain "
+            "and help you sleep better even after long screen sessions.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/4dzFSQb\n\n"
+            "#BlueLight #EyeCare #SleepBetter #WorkFromHome #SleepScape"
         ),
-        "amazon_url": "https://amzn.to/4dzFSQb",
-        "themes": ["study"],
         "dalle_prompt": (
-            "bright minimalist home office, clean white desk with laptop and plants, "
-            "natural window light, productive and fresh atmosphere, "
-            "no people, Pinterest workspace aesthetic, vertical"
+            "bright modern home office, clean white desk with open laptop, "
+            "architectural plants like a monstera in background, "
+            "large window with natural daylight, minimalist and productive atmosphere, "
+            "no people, high-end interior photography, crisp whites and greens, "
+            "ultra detailed, Pinterest workspace aesthetic, vertical"
         ),
     },
     # ── Fantasy / Cozy ──────────────────────────────────────────
@@ -189,33 +192,35 @@ PRODUCTS = [
         "title": "Fantasy Scented Candles",
         "headline": "Set the mood\nfor adventure",
         "description": (
-            "Forest, sandalwood, and amber scented candles that transform your space "
-            "for tabletop RPG sessions, cozy reading nights, or just unwinding. "
-            "🕯️ Your dungeon deserves ambiance."
+            "Forest, sandalwood, and amber scented candles that transform any space "
+            "into a cozy fantasy realm — perfect for tabletop RPG sessions and reading nights.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/4npvJd8\n\n"
+            "#ScentedCandles #CozyVibes #TTRPG #DnD #SleepScape #FantasyAesthetic"
         ),
-        "amazon_url": "https://amzn.to/4npvJd8",
-        "themes": ["fantasy", "cozy", "fireplace"],
         "dalle_prompt": (
-            "atmospheric fantasy reading nook, multiple flickering candles on an old wooden table, "
-            "leather-bound books stacked beside a cozy armchair, warm amber candlelight, "
-            "mystical and inviting evening atmosphere, no people, Pinterest fantasy cozy aesthetic, vertical"
+            "moody fantasy reading nook, multiple pillar candles of different heights "
+            "casting dramatic warm shadows, leather-bound books and a brass compass, "
+            "dark wood shelves with dried botanicals, rich dark green and amber tones, "
+            "no people, dark academia aesthetic, editorial quality lighting, "
+            "ultra detailed, Pinterest dark academia, vertical"
         ),
     },
     {
-        "id": "dnd_monster_manual",
-        "title": "D&D Monster Manual",
-        "headline": "Every dungeon\nneeds a master",
+        "id": "dnd_starter_set",
+        "title": "D&D Starter Set",
+        "headline": "Every great story\nneeds a beginning",
         "description": (
-            "The essential Dungeons & Dragons Monster Manual for game masters and players alike. "
-            "Hundreds of creatures, lore, and stats for unforgettable campaigns. "
-            "🐉 Roll for initiative."
+            "New to tabletop RPG? The Dungeons & Dragons Starter Set is everything "
+            "you need to start an epic campaign tonight.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/4nyf7Ak\n\n"
+            "#DungeonsAndDragons #TTRPG #TabletopRPG #DnD #SleepScape #FantasyGaming"
         ),
-        "amazon_url": "https://amzn.to/4nyf7Ak",
-        "themes": ["fantasy"],
         "dalle_prompt": (
-            "tabletop RPG flat lay on dark wood surface, polyhedral dice, hand-drawn dungeon map, "
-            "open fantasy rulebook, small metal miniatures, warm candlelight, "
-            "no people, Pinterest flat lay TTRPG aesthetic, vertical"
+            "dramatic tabletop RPG scene, polyhedral dice scattered on a hand-drawn parchment map, "
+            "miniature figurines mid-battle, warm candlelight from an iron candelabra, "
+            "dark oak table surface with carved patterns, moody and cinematic atmosphere, "
+            "no people, dark fantasy aesthetic, editorial photography, "
+            "ultra detailed, Pinterest TTRPG aesthetic, vertical"
         ),
     },
     {
@@ -223,16 +228,17 @@ PRODUCTS = [
         "title": "Essential Oil Diffuser",
         "headline": "Fill your room\nwith calm",
         "description": (
-            "Ultrasonic aromatherapy diffuser with soothing LED mood light. "
-            "Lavender for sleep, eucalyptus for focus, peppermint for energy. "
-            "🌿 Breathe in, stress out."
+            "Ultrasonic aromatherapy diffuser with a soothing LED mood light. "
+            "Lavender for sleep, eucalyptus for focus, cedarwood for relaxation.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3R3qsMx\n\n"
+            "#Aromatherapy #EssentialOils #SelfCare #SleepScape #WellnessRoutine"
         ),
-        "amazon_url": "https://amzn.to/3R3qsMx",
-        "themes": ["sleep", "nature", "cozy"],
         "dalle_prompt": (
-            "serene bedroom corner, white ceramic diffuser releasing soft mist, "
-            "small succulent and air plant arrangement, natural linen textures, "
-            "soft morning light, peaceful and minimal wellness aesthetic, no people, Pinterest vertical"
+            "serene wellness corner, elegant white ceramic diffuser releasing soft wispy mist, "
+            "small amber glass essential oil bottles arranged neatly, "
+            "air plants and a smooth river stone, natural linen cloth underneath, "
+            "soft morning window light, spa-like calm, no people, "
+            "clean wellness aesthetic, ultra detailed, Pinterest wellness inspo, vertical"
         ),
     },
     {
@@ -240,16 +246,17 @@ PRODUCTS = [
         "title": "Himalayan Salt Lamp",
         "headline": "Warm glow for\nsleep and calm",
         "description": (
-            "Natural Himalayan pink salt lamp creates a warm amber glow "
-            "perfect for winding down and better sleep. "
-            "🌟 Beautiful, functional, and calming."
+            "A natural Himalayan pink salt lamp creates a warm amber glow "
+            "that makes any bedroom feel like a sanctuary.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/3R3qsMx\n\n"
+            "#SaltLamp #CozyBedroom #SleepScape #BedroomDecor #WarmLighting"
         ),
-        "amazon_url": "https://amzn.to/3R3qsMx",
-        "themes": ["sleep", "cozy", "fireplace"],
         "dalle_prompt": (
-            "cozy bedroom shelf corner glowing with warm pink-amber light, "
-            "small potted plants and books beside the lamp, "
-            "soft and serene evening atmosphere, no people, Pinterest cozy bedroom aesthetic, vertical"
+            "cozy bedroom shelf styled with a glowing pink himalayan salt lamp, "
+            "surrounding succulents and trailing ivy, small framed art print, "
+            "warm amber light filling the frame, dark background for contrast, "
+            "no people, cozy bedroom shelf styling, editorial quality, "
+            "ultra detailed, Pinterest bedroom decor, vertical"
         ),
     },
     # ── Travel ───────────────────────────────────────────────────
@@ -258,16 +265,17 @@ PRODUCTS = [
         "title": "Travel Neck Pillow",
         "headline": "Sleep anywhere.\nArrive refreshed.",
         "description": (
-            "Memory foam travel neck pillow with ergonomic support and washable cover. "
-            "Sleep better on planes, trains, and long road trips. "
-            "✈️ Never arrive exhausted again."
+            "Memory foam travel neck pillow with ergonomic support. "
+            "Sleep better on planes, trains, and long road trips — and actually arrive feeling rested.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/43doCLH\n\n"
+            "#TravelTips #TravelSleep #NeckPillow #SleepScape #TravelHacks"
         ),
-        "amazon_url": "https://amzn.to/43doCLH",
-        "themes": ["travel"],
         "dalle_prompt": (
-            "airplane window seat at night, stars and city lights far below through oval window, "
-            "soft travel blanket and book on tray table, calm peaceful journey atmosphere, "
-            "no people, Pinterest travel aesthetic, vertical"
+            "atmospheric airplane window seat at night, deep dark sky with stars visible, "
+            "faint city lights far below on the horizon, soft overhead reading light, "
+            "cozy travel blanket folded on seat, small journal and pen in the pocket, "
+            "no people, cinematic travel photography, cool blue and warm amber tones, "
+            "ultra detailed, Pinterest travel aesthetic, vertical"
         ),
     },
     {
@@ -275,16 +283,17 @@ PRODUCTS = [
         "title": "Wireless Earbuds",
         "headline": "Your soundtrack,\neverywhere",
         "description": (
-            "Premium noise-canceling wireless earbuds with long battery life. "
-            "Perfect for travel, commuting, gym, and working. "
-            "🎵 Crystal clear sound, zero wires."
+            "Premium noise-canceling wireless earbuds for travel, commuting, and working out. "
+            "Crystal clear audio, long battery life, zero wires.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/4ufS1AG\n\n"
+            "#WirelessEarbuds #TravelEssentials #SleepScape #TechGadgets #NoiseCanceling"
         ),
-        "amazon_url": "https://amzn.to/4ufS1AG",
-        "themes": ["travel", "study"],
         "dalle_prompt": (
-            "minimal flat lay on soft linen surface, white wireless earbuds case open, "
-            "passport, small notebook and pen, dried flowers for styling, "
-            "clean and aesthetic travel vibes, no people, Pinterest flat lay, vertical"
+            "clean minimal flat lay on soft natural linen, white wireless earbuds case "
+            "open beside a worn leather passport holder, small journal, "
+            "dried pampas grass sprig, all arranged artfully, "
+            "soft natural side light with gentle shadows, no people, "
+            "minimalist travel flat lay, ultra detailed, Pinterest travel flat lay, vertical"
         ),
     },
     # ── Fan / Air ────────────────────────────────────────────────
@@ -293,16 +302,18 @@ PRODUCTS = [
         "title": "Quiet Tower Fan",
         "headline": "Cool air.\nBetter sleep.",
         "description": (
-            "Whisper-quiet tower fan perfect for bedrooms. "
-            "Multiple speeds, sleep timer, and remote control. "
-            "🌀 Fall asleep cool and wake up refreshed."
+            "A whisper-quiet tower fan with multiple speeds, sleep timer, and remote control. "
+            "The perfect addition to any bedroom for hot summer nights.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/4fb6Sbh\n\n"
+            "#TowerFan #SummerSleep #CoolBedroom #SleepScape #SleepTips"
         ),
-        "amazon_url": "https://amzn.to/4fb6Sbh",
-        "themes": ["fan"],
         "dalle_prompt": (
-            "airy modern bedroom in summer, light white and natural linen bedding, "
-            "sheer curtains gently billowing in a warm breeze from an open window, "
-            "bright and fresh morning light, no people, Pinterest summer bedroom aesthetic, vertical"
+            "bright airy summer bedroom, crisp white linen bedding, "
+            "sheer curtains billowing gently in a warm breeze from an open window, "
+            "sunlight casting soft shadows across the bed, small potted herbs on the windowsill, "
+            "clean and fresh morning atmosphere, no people, "
+            "summer bedroom editorial photography, bright and airy, "
+            "ultra detailed, Pinterest summer bedroom, vertical"
         ),
     },
     {
@@ -310,16 +321,17 @@ PRODUCTS = [
         "title": "HEPA Air Purifier",
         "headline": "Breathe clean.\nSleep clean.",
         "description": (
-            "True HEPA air purifier removes 99.97% of dust, pollen, and odors. "
-            "Ultra-quiet night mode for undisturbed sleep. "
-            "🌬️ Cleaner air for a healthier bedroom."
+            "A HEPA air purifier removes 99.97% of dust, pollen, and odors "
+            "for a healthier bedroom environment and better sleep quality.\n\n"
+            "🛒 Shop on Amazon → https://amzn.to/492onGS\n\n"
+            "#AirPurifier #CleanAir #HealthyHome #SleepScape #BedroomEssentials"
         ),
-        "amazon_url": "https://amzn.to/492onGS",
-        "themes": ["fan", "nature"],
         "dalle_prompt": (
-            "minimalist bright bedroom interior, soft diffused morning light, "
-            "green potted plants on windowsill, clean white walls and bedding, "
-            "fresh healthy atmosphere, no people, Pinterest minimal wellness aesthetic, vertical"
+            "serene minimalist bedroom with large windows, lush monstera and fiddle leaf fig plants, "
+            "crisp white walls and natural oak wood furniture, "
+            "soft morning light flooding the room, fresh and clean atmosphere, "
+            "no people, Japandi interior aesthetic, ultra detailed, "
+            "Pinterest minimal bedroom inspo, vertical"
         ),
     },
 ]
@@ -351,118 +363,7 @@ def pick_product() -> dict:
     return product
 
 
-# ─── Pinterest OAuth ────────────────────────────────────────────
-class _OAuthHandler(BaseHTTPRequestHandler):
-    code = None
-    def do_GET(self):
-        params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        _OAuthHandler.code = params.get("code", [None])[0]
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"<h1>Authenticated! You can close this tab.</h1>")
-    def log_message(self, *args):
-        pass
-
-
-def _authenticate(app_id: str, app_secret: str) -> dict:
-    state  = base64.urlsafe_b64encode(os.urandom(16)).decode()
-    params = urllib.parse.urlencode({
-        "client_id":     app_id,
-        "redirect_uri":  REDIRECT_URI,
-        "response_type": "code",
-        "scope":         "pins:write,boards:read",
-        "state":         state,
-    })
-    url = f"https://www.pinterest.com/oauth/?{params}"
-    print(f"\nOpen this URL in your browser:\n{url}\n")
-    webbrowser.open(url)
-
-    # ローカルサーバーでコードをキャプチャ（リダイレクト先がlocalhostの場合）
-    print("Waiting for redirect... (If nothing happens, paste the 'code' parameter from the URL manually)")
-    code = input("Paste the 'code' from the redirect URL: ").strip()
-
-    r = requests.post(
-        f"{PINTEREST_BASE}/oauth/token",
-        auth=(app_id, app_secret),
-        data={
-            "grant_type":   "authorization_code",
-            "code":         code,
-            "redirect_uri": REDIRECT_URI,
-        },
-    )
-    r.raise_for_status()
-    return r.json()
-
-
-def _refresh_token(app_id: str, app_secret: str, refresh_token: str) -> dict:
-    r = requests.post(
-        f"{PINTEREST_BASE}/oauth/token",
-        auth=(app_id, app_secret),
-        data={
-            "grant_type":    "refresh_token",
-            "refresh_token": refresh_token,
-        },
-    )
-    r.raise_for_status()
-    return r.json()
-
-
-def get_access_token() -> str:
-    env = _load_env()
-    app_id     = env.get("PINTEREST_APP_ID", "")
-    app_secret = env.get("PINTEREST_APP_SECRET", "")
-    if not app_id or not app_secret:
-        raise RuntimeError("PINTEREST_APP_ID / PINTEREST_APP_SECRET が .env に未設定です")
-
-    token_data = None
-    if os.path.exists(TOKEN_FILE):
-        with open(TOKEN_FILE, "rb") as f:
-            token_data = pickle.load(f)
-
-    if token_data and token_data.get("refresh_token"):
-        try:
-            new = _refresh_token(app_id, app_secret, token_data["refresh_token"])
-            token_data.update(new)
-            with open(TOKEN_FILE, "wb") as f:
-                pickle.dump(token_data, f)
-            return token_data["access_token"]
-        except Exception as e:
-            logging.warning(f"Token refresh failed: {e}. Re-authenticating...")
-
-    token_data = _authenticate(app_id, app_secret)
-    with open(TOKEN_FILE, "wb") as f:
-        pickle.dump(token_data, f)
-    return token_data["access_token"]
-
-
-# ─── ボードID取得 ───────────────────────────────────────────────
-def get_board_id(access_token: str, board_name: str = None) -> str:
-    env = _load_env()
-    if env.get("PINTEREST_BOARD_ID"):
-        return env["PINTEREST_BOARD_ID"]
-
-    r = requests.get(
-        f"{PINTEREST_BASE}/boards",
-        headers={"Authorization": f"Bearer {access_token}"},
-        params={"page_size": 25},
-    )
-    r.raise_for_status()
-    boards = r.json().get("items", [])
-    if not boards:
-        raise RuntimeError("ボードが見つかりません。Pinterest でボードを作成してください。")
-
-    for b in boards:
-        print(f"  {b['id']}  {b['name']}")
-
-    if board_name:
-        for b in boards:
-            if board_name.lower() in b["name"].lower():
-                return b["id"]
-
-    return boards[0]["id"]
-
-
-# ─── 画像生成 ───────────────────────────────────────────────────
+# ─── テキスト描画ヘルパー ───────────────────────────────────────
 def _draw_outlined_text(draw, xy, text, font, fill=(255, 255, 255), outline=(0, 0, 0), stroke=3):
     x, y = xy
     for dx in range(-stroke, stroke + 1):
@@ -472,134 +373,129 @@ def _draw_outlined_text(draw, xy, text, font, fill=(255, 255, 255), outline=(0, 
     draw.text((x, y), text, font=font, fill=fill)
 
 
+def _fit_font(path, text, max_width, max_size, min_size=28):
+    size = max_size
+    while size >= min_size:
+        try:
+            font = ImageFont.truetype(path, size)
+        except Exception:
+            return ImageFont.load_default()
+        w = ImageDraw.Draw(Image.new("RGB", (1, 1))).textbbox((0, 0), text, font=font)[2]
+        if w <= max_width:
+            return font
+        size -= 4
+    return ImageFont.truetype(path, min_size)
+
+
+# ─── ピン画像生成 ──────────────────────────────────────────────
 def generate_pin_image(product: dict) -> Image.Image:
     env = _load_env()
     client = OpenAI(api_key=env["OPENAI_API_KEY"])
 
-    logging.info(f"  DALL-E generating image for {product['id']}...")
+    logging.info(f"  Generating image: {product['id']}...")
     try:
         response = client.images.generate(
             model="gpt-image-1",
             prompt=product["dalle_prompt"],
             size="1024x1536",
-            quality="low",
+            quality="high",
             n=1,
         )
         img_data = base64.b64decode(response.data[0].b64_json)
         img = Image.open(io.BytesIO(img_data)).convert("RGB")
+        logging.info("  Image generated OK")
     except Exception as e:
         logging.warning(f"  DALL-E failed ({e}), using gradient fallback")
-        img = Image.new("RGB", (1024, 1536), (30, 20, 50))
+        img = Image.new("RGB", (1024, 1536), (25, 20, 45))
 
     W, H = img.size  # 1024 x 1536
 
-    # 下部グラデーションオーバーレイ
+    # ── 下部グラデーションオーバーレイ（滑らか）──
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    for y in range(H // 2, H):
-        alpha = int(210 * ((y - H // 2) / (H // 2)) ** 1.5)
+    grad_start = int(H * 0.55)
+    for y in range(grad_start, H):
+        t = (y - grad_start) / (H - grad_start)
+        alpha = int(200 * (t ** 1.4))
         for x in range(W):
             overlay.putpixel((x, y), (0, 0, 0, alpha))
     img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
-
     draw = ImageDraw.Draw(img)
 
     # ── SleepScape ブランドバッジ（右上）──
     try:
-        font_brand = ImageFont.truetype(FONT_REG, 36)
+        font_brand = ImageFont.truetype(FONT_REG, 34)
         font_moon  = ImageFont.truetype(FONT_EMOJI, 40)
     except Exception:
         font_brand = font_moon = ImageFont.load_default()
 
-    moon_w  = draw.textbbox((0, 0), "🌙", font=font_moon)[2]
-    brand_w = draw.textbbox((0, 0), " SleepScape", font=font_brand)[2]
-    bx = W - moon_w - brand_w - 20
+    moon  = "🌙"
+    label = " SleepScape"
+    mw = draw.textbbox((0, 0), moon, font=font_moon)[2]
+    lw = draw.textbbox((0, 0), label, font=font_brand)[2]
+    bx = W - mw - lw - 20
     by = 18
-    draw.text((bx, by), "🌙", font=font_moon, embedded_color=True)
-    _draw_outlined_text(draw, (bx + moon_w + 4, by + 4), "SleepScape", font=font_brand,
+    draw.text((bx, by), moon, font=font_moon, embedded_color=True)
+    _draw_outlined_text(draw, (bx + mw, by + 6), label, font=font_brand,
                         fill=(255, 255, 255), outline=(0, 0, 0), stroke=2)
 
     # ── 商品タイトル（下部）──
-    try:
-        font_title = ImageFont.truetype(FONT_BOLD, 72) if os.path.exists(FONT_BOLD) \
-            else ImageFont.truetype(FONT_REG, 72)
-    except Exception:
-        font_title = ImageFont.load_default()
-
-    margin = 40
+    font_path = FONT_BOLD if os.path.exists(FONT_BOLD) else FONT_REG
+    margin = 48
     lines  = product["headline"].split("\n")
-    y_text = H - 220
 
-    for line in reversed(lines):
-        bbox = draw.textbbox((0, 0), line, font=font_title)
-        lw   = bbox[2] - bbox[0]
-        lh   = bbox[3] - bbox[1]
-        _draw_outlined_text(draw, ((W - lw) // 2, y_text - lh),
-                            line, font=font_title,
+    # フォントサイズを行幅に合わせて自動調整
+    font_title = _fit_font(font_path, max(lines, key=len), W - margin * 2, max_size=80)
+    lh = draw.textbbox((0, 0), "A", font=font_title)[3] + 8
+
+    y_text = H - 110 - lh * len(lines)
+    for line in lines:
+        lw = draw.textbbox((0, 0), line, font=font_title)[2]
+        _draw_outlined_text(draw, ((W - lw) // 2, y_text), line, font=font_title,
                             fill=(255, 255, 255), outline=(0, 0, 0), stroke=4)
-        y_text -= lh + 8
+        y_text += lh
 
     # ── CTA ──
     try:
-        font_cta = ImageFont.truetype(FONT_REG, 38)
+        font_cta = ImageFont.truetype(FONT_REG, 32)
     except Exception:
         font_cta = ImageFont.load_default()
 
-    cta   = "Shop on Amazon →"
+    cta   = "Shop on Amazon  →"
     cta_w = draw.textbbox((0, 0), cta, font=font_cta)[2]
-    _draw_outlined_text(draw, ((W - cta_w) // 2, H - 65), cta, font=font_cta,
-                        fill=(255, 210, 100), outline=(0, 0, 0), stroke=2)
+    _draw_outlined_text(draw, ((W - cta_w) // 2, H - 68), cta, font=font_cta,
+                        fill=(255, 210, 80), outline=(0, 0, 0), stroke=2)
 
     return img
 
 
-# ─── Pinterest 投稿 ─────────────────────────────────────────────
-def post_pin(access_token: str, board_id: str, product: dict, img: Image.Image):
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=90)
-    img_b64 = base64.b64encode(buf.getvalue()).decode()
+# ─── 保存 ──────────────────────────────────────────────────────
+def save_pin(product: dict, img: Image.Image):
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    date_str = datetime.now().strftime("%Y-%m-%d_%H%M")
+    base = f"{date_str}_{product['id']}"
 
-    body = {
-        "board_id": board_id,
-        "title":    product["title"],
-        "description": product["description"],
-        "link":     product["amazon_url"],
-        "media_source": {
-            "source_type":   "image_base64",
-            "content_type":  "image/jpeg",
-            "data":          img_b64,
-        },
-    }
+    img_path = os.path.join(OUTPUT_DIR, f"{base}.jpg")
+    txt_path = os.path.join(OUTPUT_DIR, f"{base}.txt")
 
-    r = requests.post(
-        f"{PINTEREST_BASE}/pins",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type":  "application/json",
-        },
-        json=body,
-    )
-    r.raise_for_status()
-    return r.json()
+    img.save(img_path, format="JPEG", quality=95)
+
+    with open(txt_path, "w") as f:
+        f.write(f"Title: {product['title']}\n\n")
+        f.write(product["description"])
+
+    logging.info(f"  Saved: {img_path}")
+    logging.info(f"  Saved: {txt_path}")
+    return img_path
 
 
 # ─── メイン ────────────────────────────────────────────────────
 def main():
-    logging.info("=== Pinterest Auto Pin ===")
-
-    access_token = get_access_token()
-    board_id     = get_board_id(access_token)
-    logging.info(f"Board ID: {board_id}")
-
+    logging.info("=== Pinterest Pin Generator ===")
     product = pick_product()
-    logging.info(f"Product: {product['id']} — {product['title']}")
-
-    img    = generate_pin_image(product)
-    result = post_pin(access_token, board_id, product, img)
-
-    pin_id  = result.get("id", "?")
-    pin_url = f"https://www.pinterest.com/pin/{pin_id}/"
-    logging.info(f"✅ Posted: {pin_url}")
-    return result
+    logging.info(f"Product: {product['title']}")
+    img = generate_pin_image(product)
+    save_pin(product, img)
+    logging.info("Done.")
 
 
 if __name__ == "__main__":
