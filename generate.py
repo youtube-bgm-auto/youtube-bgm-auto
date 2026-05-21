@@ -398,29 +398,16 @@ def _save_fantasy_history(recent: list):
         json.dump({"recent": recent[-len(_FANTASY_KEYS):]}, f, indent=2)
 
 
-def pick_sound(prefer_fantasy: bool = True) -> dict:
+def pick_sound() -> dict:
     """
-    prefer_fantasy=True のとき約50%でファンタジー系を選ぶ。
-    ファンタジーは独自の短い履歴（8種サイクル）で管理するため
-    非ファンタジーより高頻度で登場する。
+    ファンタジー系は fantasy_upload.py が専任で担当するため、
+    main.py からはファンタジー系を選ばない。
     """
     recent_all = _load_history()
-
-    if prefer_fantasy and random.random() < 0.5:
-        # ファンタジープール（独自の短い履歴）
-        recent_f = _load_fantasy_history()
-        f_pool = [s for s in SOUNDS if s["type"] in _FANTASY_KEYS and s["type"] not in recent_f]
-        if not f_pool:
-            f_pool = [s for s in SOUNDS if s["type"] in _FANTASY_KEYS]
-        sound = random.choice(f_pool)
-        _save_fantasy_history(recent_f + [sound["type"]])
-    else:
-        # 非ファンタジープール（既存の全体履歴）
-        other_pool = [s for s in SOUNDS if s["type"] not in _FANTASY_KEYS and s["type"] not in recent_all]
-        if not other_pool:
-            other_pool = [s for s in SOUNDS if s["type"] not in _FANTASY_KEYS]
-        sound = random.choice(other_pool)
-
+    pool = [s for s in SOUNDS if s["type"] not in _FANTASY_KEYS and s["type"] not in recent_all]
+    if not pool:
+        pool = [s for s in SOUNDS if s["type"] not in _FANTASY_KEYS]
+    sound = random.choice(pool)
     recent_all.append(sound["type"])
     _save_history(recent_all)
     return sound
@@ -1169,14 +1156,14 @@ TITLE_TEMPLATES = {
     "train":      "Train Journey Sounds {d} 🚂 | Relaxing Rail Ambiance | Sleep & Focus",
     "fireplace":       "Crackling Fireplace {d} 🔥 | Cozy Winter Sounds | Sleep & Relax",
     # ── ファンタジー・世界観系 ──
-    "fantasy_library": "Ancient Magic Library Ambiance 📚🕯️ | {d} D&D Study & Focus Music",
-    "medieval_tavern": "Medieval Tavern Ambiance 🍺🔥 | {d} D&D Fantasy RPG Music",
-    "enchanted_forest":"Enchanted Forest Ambiance 🌿✨ | {d} D&D Fantasy RPG Music",
-    "ancient_temple":  "Ancient Temple Ambiance 🏛️🌙 | {d} Dark Fantasy D&D Music",
+    "fantasy_library": "Ancient Magic Library Ambiance 📚🕯️ | {d} Fantasy Study & Focus Music",
+    "medieval_tavern": "Medieval Tavern Ambiance 🍺🔥 | {d} Dark Fantasy RPG Music",
+    "enchanted_forest":"Enchanted Forest Ambiance 🌿✨ | {d} Dark Fantasy RPG Music",
+    "ancient_temple":  "Ancient Temple Ambiance 🏛️🌙 | {d} Dark Fantasy Music",
     "cozy_cottage":    "Cozy Cottage Ambiance 🏡📖 | {d} Fantasy RPG Relaxing Music",
-    "castle_wind":     "Castle Ramparts Ambiance 🏰🌬️ | {d} Medieval D&D Fantasy Music",
+    "castle_wind":     "Castle Ramparts Ambiance 🏰🌬️ | {d} Medieval Dark Fantasy Music",
     "space_station":   "Deep Space Station Ambiance 🚀🌌 | {d} Sci-Fi RPG Focus Music",
-    "dragon_cave":     "Dragon's Cave Ambiance 🐉🔥 | {d} Dark Fantasy D&D Music",
+    "dragon_cave":     "Dragon's Cave Ambiance 🐉🔥 | {d} Dark Fantasy Music",
     # ── 実録音源 ──
     "train_underpass": "Train Underpass Ambiance {d} 🚃 | Urban White Noise | Focus & Sleep",
     "study_hall":      "Study Hall Ambiance {d} 📚 | Quiet Background Noise | Focus & Deep Work",
