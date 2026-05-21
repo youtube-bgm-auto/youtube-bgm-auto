@@ -1176,24 +1176,27 @@ TITLE_TEMPLATES = {
 AFFILIATE_LINKS = {
     "default": """\
 🛒 Recommended for better sleep:
+🛏️ Premium Memory Foam Mattress → https://amzn.to/4f0yjo0
+🛏️ Luxury Hybrid Mattress → https://amzn.to/4dA1jAv
 🔊 White Noise Machine → https://amzn.to/3R3qsMx
 🎧 Sleep Headphones (Bluetooth) → https://amzn.to/4fjALG3
-😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg
-🔈 Pillow Speaker → https://amzn.to/4doJIvg""",
+😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg""",
 
     "fireplace": """\
 🛒 Create the perfect cozy atmosphere:
+🛏️ Premium Memory Foam Mattress → https://amzn.to/4f0yjo0
+🛏️ Luxury Hybrid Mattress → https://amzn.to/4dA1jAv
 🔥 Fireplace Crackling Video → https://amzn.to/4npvJd8
 🎧 Sleep Headphones (Bluetooth) → https://amzn.to/4fjALG3
-😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg
-🔈 Pillow Speaker → https://amzn.to/4doJIvg""",
+😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg""",
 
     "rain": """\
 🛒 Enhance your rainy night experience:
+🛏️ Premium Memory Foam Mattress → https://amzn.to/4f0yjo0
+🛏️ Luxury Hybrid Mattress → https://amzn.to/4dA1jAv
 🌧️ Rain Sound Machine → https://amzn.to/3QYw0bb
 🎧 Sleep Headphones (Bluetooth) → https://amzn.to/4fjALG3
-😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg
-🔈 Pillow Speaker → https://amzn.to/4doJIvg""",
+😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg""",
 
     "nature": """\
 🛒 Bring nature sounds into your space:
