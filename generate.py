@@ -1206,10 +1206,10 @@ AFFILIATE_LINKS = {
 😴 Blackout Sleep Mask → https://amzn.to/42CF7Rg""",
 
     "fantasy": """\
-🛒 Level up your tabletop RPG session:
-🐉 D&D Monster Manual → https://amzn.to/4nyf7Ak
-🎧 Gaming Headset → https://amzn.to/4fjALG3
-🔈 Bluetooth Speaker → https://amzn.to/4tvbZWX""",
+🛒 Enhance your fantasy listening experience:
+🎧 Premium Noise-Canceling Headphones → https://amzn.to/4doi7vt
+🔈 Bluetooth Speaker → https://amzn.to/4tvbZWX
+🕯️ Scented Candles Set → https://amzn.to/4npvJd8""",
 
     "study": """\
 🛒 Upgrade your study setup:
