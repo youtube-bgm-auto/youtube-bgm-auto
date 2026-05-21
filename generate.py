@@ -1220,7 +1220,7 @@ AFFILIATE_LINKS = {
 🛏️ Travel Neck Pillow → https://amzn.to/43doCLH
 🎧 Wireless Earbuds (Noise-Canceling) → https://amzn.to/4ufS1AG
 😴 Travel Eye Mask → https://amzn.to/42CF7Rg
-🔋 Portable Charger → https://amzn.to/XXXXXXX""",
+🔋 Portable Charger → https://amzn.to/49JBPzu""",
 
     "fan": """\
 🛒 Create the perfect sleep environment:
